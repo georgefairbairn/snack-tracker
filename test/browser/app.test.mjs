@@ -156,7 +156,7 @@ test('nothing overflows sideways on a phone', async () => {
   await page.close();
 });
 
-test('reaching a milestone unlocks a creature, with points rolling up', async () => {
+test('reaching a milestone unlocks an animal, with points rolling up', async () => {
   const page = await open({
     [dayKey(2)]: { george: 'green' },
     [dayKey(1)]: { george: 'green' },
@@ -175,7 +175,7 @@ test('reaching a milestone unlocks a creature, with points rolling up', async ()
 
   await page.waitForTimeout(400);
   const banner = await page.locator('.banner').first().textContent();
-  assert.match(banner, /NEW CREATURE!/);
+  assert.match(banner, /A WILD \w+ APPEARS!/);
   assert.ok(await page.locator('#fx svg.reveal').count() > 0);
   await page.close();
 });

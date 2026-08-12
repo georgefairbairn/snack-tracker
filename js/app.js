@@ -1,4 +1,4 @@
-import { currentDayKey, isEditable, toKey, fromKey, monthLabel, BACKFILL_DAYS } from './dates.js';
+import { currentDayKey, isEditable, toKey, fromKey, monthLabel } from './dates.js';
 import { computeScores, PLAYERS, RATINGS } from './scoring.js';
 import { collectionFor } from './animals.js';
 import { spriteSVG, spriteName } from './sprites.js';
@@ -186,10 +186,18 @@ function renderToday() {
   }).join('');
   pendingFlash = null;
 
-  const bothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
-  $('todayHint').innerHTML = bothGreen
-    ? 'CO-OP BONUS BANKED — +50 EACH'
-    : `DAYS ROLL OVER AT 4AM<br>YOU CAN STILL FIX THE LAST ${BACKFILL_DAYS - 1} DAYS`;
+  $('todayHint').innerHTML = todayHint();
+}
+
+/** Tells you what the day is waiting on, rather than explaining the rules. */
+function todayHint() {
+  const george = ratingOf(todayKey, 'george');
+  const izzy = ratingOf(todayKey, 'izzy');
+  if (george === 'green' && izzy === 'green') return 'BOTH GREEN. +50 EACH.';
+  if (george && izzy) return 'BOTH IN FOR TODAY.';
+  if (george) return 'WAITING ON IZZY.';
+  if (izzy) return 'WAITING ON GEORGE.';
+  return 'HOW WAS TODAY?';
 }
 
 function renderCalendar() {
@@ -242,7 +250,7 @@ function renderScores() {
           <figure class="critter" style="--d:${i * 180}ms">${spriteSVG(c.key, { scale: 2 })}
             <figcaption>${spriteName(c.key)}</figcaption>
           </figure>`).join('')}</div>`
-      : '<p class="collection-empty">NO CREATURES YET. KEEP A STREAK GOING.</p>';
+      : '<p class="collection-empty">NO ANIMALS YET.<br>KEEP IT CLEAN FOR 3 DAYS AND ONE TURNS UP.</p>';
 
     return `<div class="scorecard">
       <h2>${LABELS[player]}</h2>
@@ -293,20 +301,21 @@ function celebrate(before) {
       const critters = collectionFor(player, now.milestonesHit);
       const newest = critters[critters.length - 1];
       if (newest) {
-        banner('NEW CREATURE!', `${LABELS[player]} — ${newest.tier} ${spriteName(newest.key)}`);
+        banner(`A WILD ${spriteName(newest.key)} APPEARS!`,
+          `${newest.tier} — FOUND BY ${LABELS[player]}`);
         fx(spriteSVG(newest.key, { scale: 6, className: 'reveal' }), 2800);
       }
     } else if (now.multiplier > was.multiplier) {
-      banner('LEVEL UP!', `${LABELS[player]} — MULTIPLIER x${now.multiplier}`);
+      banner('LEVEL UP!', `${LABELS[player]} IS ON x${now.multiplier} NOW`);
     }
 
     if (now.perfectWeekAwarded && !was.perfectWeekAwarded) {
-      banner('PERFECT WEEK!', `${LABELS[player]} +500`);
+      banner('PERFECT WEEK!', `${LABELS[player]} — SEVEN IN A ROW. +500`);
     }
   }
 
   const bothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
-  if (bothGreen && !previousBothGreen) banner('CO-OP BONUS!', '+50 EACH');
+  if (bothGreen && !previousBothGreen) banner('BOTH GREEN!', 'CO-OP BONUS. +50 EACH.');
 }
 
 // ---------------------------------------------------------------- easter eggs
@@ -435,10 +444,10 @@ async function main() {
   const mode = await store.init();
   const status = $('status');
   if (mode === 'live') {
-    status.textContent = 'LIVE — SHARED WITH IZZY';
+    status.textContent = 'CONNECTED — IZZY SEES THIS TOO';
     status.className = 'status is-live';
   } else {
-    status.textContent = 'OFFLINE — THIS DEVICE ONLY';
+    status.textContent = "OFFLINE — IZZY WON'T SEE THIS";
     status.className = 'status is-offline';
   }
 

@@ -30,8 +30,8 @@ before the live site changes.
 ### If Firestore is unreachable
 
 The page falls back to this-device-only storage and says so in the header:
-`OFFLINE — THIS DEVICE ONLY`. Nothing is shared in that state. If you see it and
-you didn't expect to, Firestore is misconfigured or unreachable.
+`OFFLINE — IZZY WON'T SEE THIS`. Nothing is shared in that state. If you see it
+and you didn't expect to, Firestore is misconfigured or unreachable.
 
 ## Scoring
 
@@ -60,7 +60,7 @@ days before it**; older days lock as Unlogged and end a Streak.
 
 ## Animals
 
-Reaching a Streak of 3, 7, 14 or 30 days unlocks a creature drawn at random from
+Reaching a Streak of 3, 7, 14 or 30 days unlocks an animal drawn at random from
 that rarity tier. Each Player draws separately, so your collections will differ.
 Only unlocked animals are ever shown — no grey silhouettes, because visible empty
 slots turn a surprise into a checklist.
@@ -76,7 +76,7 @@ here. That is the point of them.
 ## Animation
 
 Scores roll up rather than snapping, greens throw pixel confetti, a red shakes
-the cabinet, reaching a new multiplier tier or unlocking a creature raises a
+the cabinet, reaching a new multiplier tier or unlocking an animal raises a
 banner, and the calendar cascades in when you change month. Banners queue rather
 than stack, since a level-up and a co-op bonus can land on the same tap.
 
