@@ -17,8 +17,22 @@ The running numeric total a Player accumulates from their Ratings. Each Player's
 _Avoid_: score, count, tally
 
 **Streak**:
-The number of consecutive days a Player has kept going without a red Rating.
+The number of consecutive days a Player has kept going without a red Rating. A yellow Rating holds a Streak without extending it; only a red ends one.
 _Avoid_: run, chain, combo
+
+### Scoring
+
+**Multiplier**:
+The factor a Player's green Ratings are worth, rising in tiers as their Streak lengthens and falling back to its floor when a red ends the Streak. Yellow Ratings are never multiplied.
+_Avoid_: combo, bonus, level
+
+**Co-op Bonus**:
+A flat bonus paid to both Players on any day they are both green. The one part of scoring that is shared rather than individual.
+_Avoid_: team bonus, couple bonus
+
+**Perfect Week**:
+A one-off award for seven consecutive green Ratings, paid the first time a Player achieves it.
+_Avoid_: clean week, full week
 
 ### A note on "score"
 
