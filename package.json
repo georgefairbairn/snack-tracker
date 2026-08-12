@@ -1,0 +1,10 @@
+{
+  "name": "snack-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A retro-gaming snack tracker for two. No build step - the site is plain files served straight from the repo. This package.json exists only so the scoring tests can run under node.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}
