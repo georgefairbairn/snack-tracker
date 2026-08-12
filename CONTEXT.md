@@ -20,6 +20,10 @@ _Avoid_: score, count, tally
 The number of consecutive days a Player has kept going without a red Rating. A yellow Rating holds a Streak without extending it; only a red ends one.
 _Avoid_: run, chain, combo
 
+**Unlogged**:
+A past day that no longer accepts a Rating, because it fell outside the window in which days can still be filled in. Distinct from a red Rating: nothing was judged, but it ends a Streak all the same.
+_Avoid_: missing, blank, skipped, empty
+
 ### Scoring
 
 **Multiplier**:
