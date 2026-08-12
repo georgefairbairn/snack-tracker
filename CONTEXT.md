@@ -8,6 +8,10 @@ A two-person tracker where George and Izzy each record one honest judgement per 
 George or Izzy — one of the two people whose days are tracked. Chosen over neutral alternatives because the site is themed as a retro game.
 _Avoid_: user, account, profile
 
+**Day**:
+The unit a Rating attaches to. A Day runs from 4am to 4am local time, not midnight to midnight, so a late-night snack belongs to the evening it happened in rather than the morning after.
+_Avoid_: date, session, 24 hours
+
 **Rating**:
 The single red, yellow or green judgement a Player records for one day. Red means they ate something properly bad, yellow something mildly bad, green nothing bad. The colour is the whole record — there is no underlying list of what was eaten.
 _Avoid_: score, status, entry, log
