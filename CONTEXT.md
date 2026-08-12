@@ -42,6 +42,20 @@ _Avoid_: team bonus, couple bonus
 A one-off award for seven consecutive green Ratings, paid the first time a Player achieves it.
 _Avoid_: clean week, full week
 
+### Rewards
+
+**Milestone**:
+A Streak length that awards an animal. Reaching one draws from a rarity tier rather than granting a specific animal, so the milestone is known in advance but the animal is not.
+_Avoid_: level, achievement, badge
+
+**Collection**:
+The animals a Player has unlocked. Each Player has their own, and the two will differ. Only unlocked animals are ever shown — there are no empty slots, so neither Player knows what remains or how many there are.
+_Avoid_: inventory, zoo, gallery
+
+**Secret**:
+A hidden easter egg found by exploring rather than earned by a Streak. Never referenced anywhere in the interface — a Secret that is advertised is not one.
+_Avoid_: easter egg, unlockable, bonus
+
 ### A note on "score"
 
 "Score" is deliberately banned. It was ambiguous between the day's colour and the running total, which are different things. Use **Rating** for the colour and **Points** for the total.
