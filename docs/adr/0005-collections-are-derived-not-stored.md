@@ -1,6 +1,6 @@
 # Collections are derived, not stored
 
-A Player's Collection is never written to the database. Each Milestone draw is seeded from the Player's name and the Milestone number, making the whole Collection a pure function of that Player's Rating history — recomputed on page load, identical every time.
+A Player's Collection is never written to the database. Each Milestone draw walks a shuffle of its rarity tier seeded from the Player's name and the Milestone number, indexed by how many times that Player has reached that Milestone before. The whole Collection is therefore a pure function of that Player's Rating history — recomputed on page load, identical every time, and no animal repeats until its tier is exhausted.
 
 The draws still feel random to the Players, because neither knows the seeding scheme or which animal sits behind a given tier and index.
 
