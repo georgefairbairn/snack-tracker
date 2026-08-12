@@ -23,16 +23,14 @@ service cloud.firestore {
           && asTimestamp(d) < request.time + duration.value(2, 'd');
     }
 
-    function validRating(data, player) {
-      return !(player in data) || data[player] in ['red', 'yellow', 'green'];
-    }
-
     // Only the two Players, only the three Ratings, nothing else in the document.
+    // Written out per Player rather than looked up by a variable key, so it uses
+    // nothing beyond plainly supported rules syntax.
     function validShape(data) {
       return data.keys().hasOnly(['george', 'izzy'])
           && data.keys().size() > 0
-          && validRating(data, 'george')
-          && validRating(data, 'izzy');
+          && (!('george' in data) || data.george in ['red', 'yellow', 'green'])
+          && (!('izzy' in data) || data.izzy in ['red', 'yellow', 'green']);
     }
 
     match /days/{date} {
