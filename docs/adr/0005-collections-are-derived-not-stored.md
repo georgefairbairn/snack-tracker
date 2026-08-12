@@ -6,7 +6,7 @@ The draws still feel random to the Players, because neither knows the seeding sc
 
 ## Consequences
 
-There is no write path for Collections, which matters more than usual here: the database has no sign-in (see ADR 0004), so every stored field is a field a stranger could write. Deriving the Collection means nobody can grant themselves a blue whale, and there is no extra state to keep consistent with the Ratings it depends on.
+There is no write path for Collections, which matters more than usual here: the database has no sign-in (see ADR 0003), so every stored field is a field a stranger could write. Deriving the Collection means nobody can grant themselves a blue whale, and there is no extra state to keep consistent with the Ratings it depends on.
 
 The cost is that the animal tiers and the seeding function become part of the data model in effect, even though they live in code. Changing the contents or ordering of a tier retroactively changes which animals Players have already unlocked. If the tiers ever need editing after launch, they must be appended to rather than reordered.
 
