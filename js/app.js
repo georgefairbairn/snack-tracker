@@ -6,19 +6,149 @@ import * as store from './store.js';
 
 const LABELS = { george: 'GEORGE', izzy: 'IZZY' };
 const RATING_TEXT = { red: 'RED', yellow: 'YELLOW', green: 'GREEN' };
+const RATING_COLOUR = { red: '#e8402a', yellow: '#f5c518', green: '#3ac04a' };
 
 const $ = (id) => document.getElementById(id);
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let days = {};
 let todayKey = currentDayKey();
 let scores = computeScores({}, todayKey);
 let viewYear, viewMonth;
 let editorKey = null;
-// Milestone counts from the previous render, so a new unlock can be announced.
-let lastMilestoneCount = { george: 0, izzy: 0 };
+
 // Stays false until the store has delivered its first payload. Without it, every
 // page load would replay every animal already earned as if it were new.
 let hydrated = false;
+// Previous scores, so a render can tell what actually changed and celebrate it.
+let previous = null;
+let previousBothGreen = false;
+// Panel flash queued by a tap, applied on the render that follows it.
+let pendingFlash = null;
+// Cascading the calendar on every data change would strobe, so only on a month change.
+let lastCascade = null;
+
+// ---------------------------------------------------------------- effects
+
+function fx(html, ms = 6200) {
+  const el = document.createElement('div');
+  el.innerHTML = html;
+  const node = el.firstElementChild;
+  $('fx').appendChild(node);
+  setTimeout(() => node.remove(), ms);
+}
+
+function toast(text, ms = 3600) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
+// Banners can collide — a level-up and a co-op bonus land on the same tap — so
+// they queue rather than stack on top of each other.
+const bannerQueue = [];
+let bannerRunning = false;
+
+function banner(title, subtitle = '') {
+  bannerQueue.push({ title, subtitle });
+  if (!bannerRunning) nextBanner();
+}
+
+function nextBanner() {
+  const item = bannerQueue.shift();
+  if (!item) { bannerRunning = false; return; }
+  bannerRunning = true;
+  const el = document.createElement('div');
+  el.className = 'banner';
+  el.innerHTML = `${item.title}${item.subtitle ? `<small>${item.subtitle}</small>` : ''}`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.remove(); nextBanner(); }, reducedMotion ? 400 : 1900);
+}
+
+function shake() {
+  if (reducedMotion) return;
+  document.body.classList.add('shake');
+  setTimeout(() => document.body.classList.remove('shake'), 900);
+}
+
+/** Pixel confetti thrown from a screen point. */
+function particles(x, y, colour, count = 14) {
+  if (reducedMotion) return;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const distance = 40 + Math.random() * 70;
+    p.style.left = `${x}px`;
+    p.style.top = `${y}px`;
+    p.style.background = colour;
+    p.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+    p.style.setProperty('--dy', `${Math.sin(angle) * distance - 20}px`);
+    p.style.setProperty('--dur', `${700 + Math.random() * 500}ms`);
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 1300);
+  }
+}
+
+function makeStars(n = 34) {
+  if (reducedMotion) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'stars';
+  wrap.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('i');
+    s.className = 'star';
+    s.style.left = `${Math.random() * 100}%`;
+    s.style.top = `${Math.random() * 100}%`;
+    s.style.animationDelay = `${Math.random() * 4}s`;
+    wrap.appendChild(s);
+  }
+  document.body.appendChild(wrap);
+}
+
+// ---------------------------------------------------------------- points tween
+
+// Points roll up rather than snapping, which is most of what makes a score feel
+// like a score. Rendering writes the displayed value; this walks it to the real one.
+const ROLL_MS = 750;
+const displayed = { george: 0, izzy: 0 };
+const tween = {
+  george: { from: 0, to: 0, start: 0 },
+  izzy: { from: 0, to: 0, start: 0 },
+};
+let tweening = false;
+
+function tickPoints(now) {
+  let active = false;
+  for (const player of PLAYERS) {
+    const t = tween[player];
+    const progress = t.from === t.to ? 1 : Math.min(1, (now - t.start) / ROLL_MS);
+    const eased = 1 - (1 - progress) ** 3; // ease-out: fast start, settles gently
+    displayed[player] = Math.round(t.from + (t.to - t.from) * eased);
+    if (progress < 1) active = true;
+
+    for (const el of document.querySelectorAll(`[data-points="${player}"]`)) {
+      el.textContent = displayed[player].toLocaleString();
+      el.classList.toggle('counting', progress < 1);
+    }
+  }
+  if (active) requestAnimationFrame(tickPoints);
+  else tweening = false;
+}
+
+function startTween() {
+  const now = performance.now();
+  for (const player of PLAYERS) {
+    const target = scores[player].points;
+    if (tween[player].to === target) continue;
+    tween[player] = reducedMotion
+      ? { from: target, to: target, start: now }
+      : { from: displayed[player], to: target, start: now };
+  }
+  if (!tweening) { tweening = true; requestAnimationFrame(tickPoints); }
+}
 
 // ---------------------------------------------------------------- rendering
 
@@ -40,10 +170,11 @@ function renderToday() {
   $('players').innerHTML = PLAYERS.map((player) => {
     const s = scores[player];
     const current = ratingOf(todayKey, player);
-    return `<div class="player">
+    const flash = pendingFlash?.player === player ? ` flash-${pendingFlash.rating}` : '';
+    return `<div class="player${flash}">
       <div class="player-head">
         <span class="player-name">${LABELS[player]}</span>
-        <span class="player-points">${s.points.toLocaleString()} PTS</span>
+        <span class="player-points"><span data-points="${player}">0</span> PTS</span>
       </div>
       <div class="player-meta">
         <span>STREAK <b>${s.streak}</b></span>
@@ -53,6 +184,7 @@ function renderToday() {
       ${choicesHTML(player, todayKey)}
     </div>`;
   }).join('');
+  pendingFlash = null;
 
   const bothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
   $('todayHint').innerHTML = bothGreen
@@ -84,15 +216,21 @@ function renderCalendar() {
       return `<i${r ? ` data-r="${r}"` : ''}></i>`;
     }).join('');
 
-    cells.push(`<${editable ? 'button' : 'div'} class="${cls.join(' ')}" ${editable ? `data-open="${key}"` : ''}>
+    const delay = `--d:${Math.round((lead + day) * 14)}ms`;
+    cells.push(`<${editable ? 'button' : 'div'} class="${cls.join(' ')}" style="${delay}" ${editable ? `data-open="${key}"` : ''}>
       ${bars}<span>${day}</span>
     </${editable ? 'button' : 'div'}>`);
   }
 
-  $('calendar').innerHTML = cells.join('');
+  const grid = $('calendar');
+  grid.innerHTML = cells.join('');
 
-  const now = new Date(todayKey.slice(0, 4), Number(todayKey.slice(5, 7)) - 1, 1);
-  $('nextMonth').disabled = new Date(viewYear, viewMonth, 1) >= now;
+  const monthKey = `${viewYear}-${viewMonth}`;
+  grid.classList.toggle('cascade', lastCascade !== monthKey);
+  lastCascade = monthKey;
+
+  const thisMonth = new Date(Number(todayKey.slice(0, 4)), Number(todayKey.slice(5, 7)) - 1, 1);
+  $('nextMonth').disabled = new Date(viewYear, viewMonth, 1) >= thisMonth;
 }
 
 function renderScores() {
@@ -100,15 +238,15 @@ function renderScores() {
     const s = scores[player];
     const critters = collectionFor(player, s.milestonesHit);
     const collection = critters.length
-      ? `<div class="collection">${critters.map((c) => `
-          <figure class="critter">${spriteSVG(c.key, { scale: 2 })}
+      ? `<div class="collection">${critters.map((c, i) => `
+          <figure class="critter" style="--d:${i * 180}ms">${spriteSVG(c.key, { scale: 2 })}
             <figcaption>${spriteName(c.key)}</figcaption>
           </figure>`).join('')}</div>`
       : '<p class="collection-empty">NO CREATURES YET. KEEP A STREAK GOING.</p>';
 
     return `<div class="scorecard">
       <h2>${LABELS[player]}</h2>
-      <div class="statline"><span>POINTS</span><b>${s.points.toLocaleString()}</b></div>
+      <div class="statline"><span>POINTS</span><b data-points="${player}">0</b></div>
       <div class="statline"><span>STREAK</span><b>${s.streak}</b></div>
       <div class="statline"><span>BEST STREAK</span><b>${s.bestStreak}</b></div>
       <div class="statline"><span>MULTIPLIER</span><b>x${s.multiplier}</b></div>
@@ -129,31 +267,49 @@ function renderEditor() {
 }
 
 function renderAll() {
+  const before = previous;
   scores = computeScores(days, todayKey);
   renderToday();
   renderCalendar();
   renderScores();
   renderEditor();
-  announceNewMilestones();
+  startTween();
+  if (before) celebrate(before);
+  previous = structuredClone(scores);
+  previousBothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
+}
+
+// ---------------------------------------------------------------- celebration
+
+/** Compares this render against the last and announces anything worth a fanfare. */
+function celebrate(before) {
+  if (!hydrated) return;
+
+  for (const player of PLAYERS) {
+    const was = before[player];
+    const now = scores[player];
+
+    if (now.milestonesHit.length > was.milestonesHit.length) {
+      const critters = collectionFor(player, now.milestonesHit);
+      const newest = critters[critters.length - 1];
+      if (newest) {
+        banner('NEW CREATURE!', `${LABELS[player]} — ${newest.tier} ${spriteName(newest.key)}`);
+        fx(spriteSVG(newest.key, { scale: 6, className: 'reveal' }), 2800);
+      }
+    } else if (now.multiplier > was.multiplier) {
+      banner('LEVEL UP!', `${LABELS[player]} — MULTIPLIER x${now.multiplier}`);
+    }
+
+    if (now.perfectWeekAwarded && !was.perfectWeekAwarded) {
+      banner('PERFECT WEEK!', `${LABELS[player]} +500`);
+    }
+  }
+
+  const bothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
+  if (bothGreen && !previousBothGreen) banner('CO-OP BONUS!', '+50 EACH');
 }
 
 // ---------------------------------------------------------------- easter eggs
-
-function fx(html, ms = 6200) {
-  const el = document.createElement('div');
-  el.innerHTML = html;
-  const node = el.firstElementChild;
-  $('fx').appendChild(node);
-  setTimeout(() => node.remove(), ms);
-}
-
-function toast(text, ms = 3600) {
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.innerHTML = text;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), ms);
-}
 
 function releaseWhale() {
   fx(spriteSVG('bluewhale', { scale: 6, className: 'swim' }));
@@ -162,26 +318,11 @@ function releaseWhale() {
 function summonBoss() {
   fx(spriteSVG('hippo', { scale: 5, className: 'stomp' }), 2800);
   toast('THE HIPPO SAW THAT.');
+  shake();
 }
 
 function releaseMouse() {
   fx(spriteSVG('mouse', { scale: 3, className: 'scurry' }), 3400);
-}
-
-/** A new animal landed since the last render — announce it, don't spoil it early. */
-function announceNewMilestones() {
-  for (const player of PLAYERS) {
-    const count = scores[player].milestonesHit.length;
-    if (hydrated && count > lastMilestoneCount[player]) {
-      const critters = collectionFor(player, scores[player].milestonesHit);
-      const newest = critters[critters.length - 1];
-      if (newest) {
-        toast(`${LABELS[player]} UNLOCKED<br>${newest.tier} — ${spriteName(newest.key)}`, 5200);
-        fx(spriteSVG(newest.key, { scale: 6, className: 'swim' }));
-      }
-    }
-    lastMilestoneCount[player] = count;
-  }
 }
 
 function wireKonami() {
@@ -215,20 +356,31 @@ function switchView(name) {
   for (const view of ['today', 'calendar', 'scores']) {
     $(`view-${view}`).hidden = view !== name;
   }
+  // The tween writes into whichever view is now on screen.
+  startTween();
 }
 
-async function choose(player, key, rating) {
-  const previous = ratingOf(key, player);
+async function choose(player, key, rating, origin) {
+  const previousRating = ratingOf(key, player);
+  pendingFlash = { player, rating };
+
+  if (origin && rating !== 'red') {
+    particles(origin.x, origin.y, RATING_COLOUR[rating], rating === 'green' ? 16 : 8);
+  }
+
   const local = await store.setRating(key, player, rating);
   if (local) { days = local; renderAll(); }
-  if (rating === 'red' && previous !== 'red') summonBoss();
+
+  if (rating === 'red' && previousRating !== 'red') summonBoss();
 }
 
 function wireEvents() {
   document.addEventListener('click', (e) => {
     const choice = e.target.closest('.choice');
     if (choice) {
-      choose(choice.dataset.player, choice.dataset.key, choice.dataset.r);
+      const box = choice.getBoundingClientRect();
+      choose(choice.dataset.player, choice.dataset.key, choice.dataset.r,
+        { x: box.left + box.width / 2, y: box.top + box.height / 2 });
       return;
     }
     const open = e.target.closest('[data-open]');
@@ -275,6 +427,7 @@ async function main() {
   viewYear = d.getFullYear();
   viewMonth = d.getMonth();
 
+  makeStars();
   wireEvents();
   wireKonami();
   renderAll();
@@ -290,7 +443,11 @@ async function main() {
   }
 
   // The first payload sets the baseline silently; only changes after it are new.
-  store.subscribe((next) => { days = next; renderAll(); hydrated = true; });
+  store.subscribe((next) => {
+    days = next;
+    renderAll();
+    hydrated = true;
+  });
 }
 
 main();

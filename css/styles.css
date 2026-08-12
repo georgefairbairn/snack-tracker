@@ -344,6 +344,130 @@ main { padding: 4px 10px 20px; max-width: 560px; margin: 0 auto; }
   cursor: pointer;
 }
 
+/* ---------------- animation ---------------- */
+
+/* Starfield. Purely decorative, sits behind everything, never intercepts taps. */
+.stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--ink);
+  opacity: 0.18;
+  animation: twinkle 4s steps(2) infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.05 }
+  50% { opacity: 0.32 }
+}
+
+/* Everything above the starfield. `.tabs` is deliberately absent — it is
+   position:fixed and already has a z-index, and restating position here would
+   drop it out of the viewport and into the page flow. */
+.topbar, main { position: relative; z-index: 1; }
+
+/* Views arrive with a short step-scaled entrance — reads as a screen change
+   rather than a web page repaint. */
+.view:not([hidden]) { animation: view-in 220ms steps(4) both; }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(10px) }
+  to { opacity: 1; transform: none }
+}
+
+/* Panel reacting to a Rating being set. */
+.player.flash-green { animation: flash-green 520ms steps(3); }
+.player.flash-yellow { animation: flash-yellow 520ms steps(3); }
+.player.flash-red { animation: flash-red 520ms steps(3); }
+@keyframes flash-green {
+  0%, 100% { border-color: var(--ink) } 50% { border-color: var(--green); background: #16301a }
+}
+@keyframes flash-yellow {
+  0%, 100% { border-color: var(--ink) } 50% { border-color: var(--yellow); background: #302a12 }
+}
+@keyframes flash-red {
+  0%, 100% { border-color: var(--ink) } 50% { border-color: var(--red); background: #2e1512 }
+}
+
+/* A red day shakes the cabinet. */
+.shake { animation: shake 420ms steps(2) 2; }
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0) }
+  25% { transform: translate(-4px, 2px) }
+  50% { transform: translate(4px, -2px) }
+  75% { transform: translate(-3px, -1px) }
+}
+
+/* Points ticking up. */
+.player-points.counting, .statline b.counting { color: var(--green); }
+
+/* Pixel confetti. Each piece gets its own --dx/--dy/--rot. */
+.particle {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  z-index: 66;
+  pointer-events: none;
+  animation: burst var(--dur, 900ms) steps(6) forwards;
+}
+@keyframes burst {
+  from { transform: translate(0, 0); opacity: 1 }
+  to { transform: translate(var(--dx), var(--dy)); opacity: 0 }
+}
+
+/* LEVEL UP / CO-OP / PERFECT WEEK banner. */
+/* Sits below the creature reveal, which occupies roughly 26%-46%. */
+.banner {
+  position: fixed;
+  left: 50%;
+  top: 58%;
+  transform: translate(-50%, -50%);
+  z-index: 68;
+  pointer-events: none;
+  text-align: center;
+  font-size: 16px;
+  color: var(--yellow);
+  text-shadow: 4px 4px 0 #000, 0 0 12px rgba(245, 197, 24, 0.5);
+  animation: banner 1900ms steps(4) forwards;
+  white-space: nowrap;
+}
+.banner small { display: block; font-size: 8px; color: var(--ink); margin-top: 8px; text-shadow: 2px 2px 0 #000; }
+@keyframes banner {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) }
+  32% { transform: translate(-50%, -50%) scale(1) }
+  80% { opacity: 1 }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(1) }
+}
+
+/* Calendar cells cascade in when the month changes. */
+.calendar.cascade .cell { animation: cell-in 260ms steps(3) both; animation-delay: var(--d, 0ms); }
+@keyframes cell-in {
+  from { opacity: 0; transform: scale(0.55) }
+  to { opacity: 1; transform: none }
+}
+
+/* Collected creatures idle. */
+.critter svg { animation: bob 2.4s steps(2) infinite; animation-delay: var(--d, 0ms); }
+@keyframes bob {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-3px) }
+}
+
+/* A newly unlocked creature makes an entrance before joining the collection. */
+.reveal {
+  left: 50%;
+  top: 26%;
+  margin-left: -48px;
+  animation: reveal 2600ms steps(4) forwards;
+}
+@keyframes reveal {
+  0% { opacity: 0; transform: scale(0.2) translateY(40px) }
+  18% { opacity: 1; transform: scale(1.2) translateY(0) }
+  28% { transform: scale(1) }
+  70% { opacity: 1; transform: scale(1) translateY(0) }
+  100% { opacity: 0; transform: scale(0.8) translateY(-60px) }
+}
+
 /* ---------------- easter eggs ---------------- */
 .fx { position: fixed; inset: 0; pointer-events: none; z-index: 65; overflow: hidden; }
 .fx svg { image-rendering: pixelated; position: absolute; }

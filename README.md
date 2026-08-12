@@ -73,6 +73,24 @@ retroactively changes which animals you have already unlocked.
 There are also easter eggs that are not milestones. They are not documented
 here. That is the point of them.
 
+## Animation
+
+Scores roll up rather than snapping, greens throw pixel confetti, a red shakes
+the cabinet, reaching a new multiplier tier or unlocking a creature raises a
+banner, and the calendar cascades in when you change month. Banners queue rather
+than stack, since a level-up and a co-op bonus can land on the same tap.
+
+All of it is suppressed under `prefers-reduced-motion: reduce`, including the
+starfield — that is a real setting people turn on for real reasons, not a
+checkbox.
+
+Two things to know if you touch the CSS. Animation rules live at the end of the
+stylesheet, so **never restate `position` on an element that is already
+`fixed`** — doing so once dropped the tab bar out of the viewport into the page
+flow. And `[hidden] { display: none !important }` near the top is load-bearing:
+without it `.modal { display: flex }` wins, and an invisible modal covers the
+page and swallows every tap.
+
 ## Why not a Game Boy palette
 
 The obvious retro-handheld look is four shades of green. This entire product is a
