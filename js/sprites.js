@@ -95,6 +95,29 @@ export const SPRITES = {
     ],
   },
 
+  pangolin: {
+    name: 'PANGOLIN',
+    palette: { d: '#5c3d1c', s: '#a97b45', l: '#d9b47a', k: '#8a6338', e: '#140c04' },
+    rows: [
+      '................',
+      '.....dddd.......',
+      '...ddslsldd.....',
+      '..dlslslsldd....',
+      '.dkslslslslsdd..',
+      'dkelslslslslsldd',
+      'dkkslslslslslsls',
+      '.dlslslslslslsld',
+      '..dslslslsldds..',
+      '...dlslsldd.....',
+      '...d.dd.dd......',
+      '...d.dd.dd......',
+      '................',
+      '................',
+      '................',
+      '................',
+    ],
+  },
+
   // ---- uncommon --------------------------------------------------------
   zebra: {
     name: 'ZEBRA',

@@ -66,9 +66,13 @@ Only unlocked animals are ever shown — no grey silhouettes, because visible em
 slots turn a surprise into a checklist.
 
 Draws are seeded from the Player and the milestone, so a Collection is a pure
-function of Rating history and is never stored. **Animal tiers in
-[`js/animals.js`](./js/animals.js) may only be appended to** — reordering one
-retroactively changes which animals you have already unlocked.
+function of Rating history and is never stored. One exception: Izzy's first
+animal is pinned to the pangolin. Everything after it is drawn normally.
+
+**Animal tiers in [`js/animals.js`](./js/animals.js) may only be appended to** —
+reordering one retroactively changes which animals you have already unlocked.
+That constraint is free to break right now, before anyone has a Streak, and
+expensive the moment someone does.
 
 There are also easter eggs that are not milestones. They are not documented
 here. That is the point of them.

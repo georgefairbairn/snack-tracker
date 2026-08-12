@@ -4,7 +4,7 @@
 // Rating history — nothing is stored. See docs/adr/0005.
 
 export const TIER_POOLS = {
-  3: ['meerkat', 'tortoise', 'penguin', 'goat'],
+  3: ['meerkat', 'tortoise', 'penguin', 'goat', 'pangolin'],
   7: ['zebra', 'flamingo', 'octopus', 'toucan'],
   14: ['elephant', 'tiger', 'orca', 'gorilla'],
   30: ['bluewhale', 'whiterhino', 'giantpanda'],
@@ -53,15 +53,33 @@ function seededShuffle(items, seed) {
   return out;
 }
 
+// Izzy's very first animal is always the pangolin, because it was asked for by
+// name. Pinning it beats fishing for a seed that happens to produce it: this
+// survives a rename, and it is obvious to the next reader that it is deliberate.
+// Everything after the first draw follows the shuffle as normal.
+const PINNED_FIRST = { izzy: 'pangolin' };
+const FIRST_MILESTONE = Math.min(...Object.keys(TIER_POOLS).map(Number));
+
+/** The full order a Player will draw a tier in — a permutation, so no repeats. */
+function orderFor(player, milestone) {
+  const pool = TIER_POOLS[milestone];
+  if (!pool) return null;
+  const shuffled = seededShuffle(pool, `${player}:${milestone}`);
+  const pinned = PINNED_FIRST[player];
+  if (milestone === FIRST_MILESTONE && pinned && shuffled.includes(pinned)) {
+    return [pinned, ...shuffled.filter((animal) => animal !== pinned)];
+  }
+  return shuffled;
+}
+
 /**
  * Which animal a Player gets the `occurrence`-th time they reach `milestone`.
  * Draws walk a seeded shuffle of the tier, so a Player never repeats an animal
  * until the whole tier is exhausted.
  */
 export function drawFor(player, milestone, occurrence) {
-  const pool = TIER_POOLS[milestone];
-  if (!pool) return null;
-  return seededShuffle(pool, `${player}:${milestone}`)[occurrence % pool.length];
+  const order = orderFor(player, milestone);
+  return order ? order[occurrence % order.length] : null;
 }
 
 /**

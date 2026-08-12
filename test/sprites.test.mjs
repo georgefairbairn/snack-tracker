@@ -53,6 +53,25 @@ test('players draw independently', () => {
   assert.notDeepEqual(georges, izzys, 'both players drawing the same order would be a bug');
 });
 
+test('izzy\'s first animal is always the pangolin', () => {
+  assert.equal(drawFor('izzy', 3, 0), 'pangolin');
+  assert.equal(collectionFor('izzy', [3])[0].key, 'pangolin');
+});
+
+test('the pin only affects izzy\'s first draw, not the rest', () => {
+  const pool = TIER_POOLS[3];
+  const izzy = pool.map((_, i) => drawFor('izzy', 3, i));
+  assert.equal(izzy[0], 'pangolin');
+  assert.equal(new Set(izzy).size, pool.length, 'still a full permutation, no repeats');
+  assert.equal(izzy.filter((a) => a === 'pangolin').length, 1, 'pangolin appears once');
+});
+
+test('george is not pinned', () => {
+  const drawn = TIER_POOLS[3].map((_, i) => drawFor('george', 3, i));
+  assert.equal(new Set(drawn).size, TIER_POOLS[3].length);
+  assert.notEqual(drawn[0], drawFor('izzy', 3, 0), 'the two players should not open the same');
+});
+
 test('a tier is exhausted before any animal repeats', () => {
   const pool = TIER_POOLS[3];
   const drawn = pool.map((_, i) => drawFor('george', 3, i));
