@@ -5,6 +5,11 @@
   "type": "module",
   "description": "A retro-gaming snack tracker for two. No build step - the site is plain files served straight from the repo. This package.json exists only so the scoring tests can run under node.",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node --test test/browser/*.test.mjs",
+    "serve": "python3 -m http.server 8765"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
   }
 }

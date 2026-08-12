@@ -100,13 +100,24 @@ yellow. NES it is.
 ## Development
 
 ```sh
-npm test                      # scoring, dates, sprites, animal draws
-python3 -m http.server 8765   # then open http://localhost:8765
+npm test          # scoring, dates, sprites, animal draws — no dependencies
+npm run serve     # then open http://localhost:8765
+
+npm install                        # playwright, for the browser suite only
+npx playwright install chromium
+npm run test:browser               # drives the real page in a real browser
 ```
 
 The scoring in [`js/scoring.js`](./js/scoring.js) is pure and has no DOM or
 Firebase dependency, which is why it can be tested directly. If you change the
 numbers, change the tests with them — several assertions are hand-calculated.
+
+The browser suite in [`test/browser/`](./test/browser) starts its own static
+server, so it needs nothing running. It earns its keep: every serious bug in
+this project so far was caught there and would have survived a careful code
+read — an invisible modal swallowing every tap, already-earned animals being
+re-announced on each page load, and the tab bar falling out of the viewport.
+Set `CHROME_PATH` to point at a browser Playwright did not install.
 
 ## Backups
 
