@@ -2,7 +2,7 @@
 
 The site has no login. Opening the URL is enough to record a Rating. This is a deliberate product decision: the tracker only works if both Players log every day, and any friction on the path to tapping a colour is a threat to that habit.
 
-Because the site is public and the Firebase config is visible in the page, access control cannot rest on identity. It rests on the shape of what may be written instead. Security Rules accept a write only when it targets `ratings/{player}/{date}` for a known Player, carries exactly one of the three valid Rating values, and lands on a date inside the backfill window. Deletes are rejected. History older than the backfill window is immutable.
+Because the site is public and the Firebase config is visible in the page, access control cannot rest on identity. It rests on the shape of what may be written instead. Security Rules accept a write only when it targets `days/{YYYY-MM-DD}`, contains no fields beyond the two known Players, carries exactly one of the three valid Rating values for each, and lands on a date inside the backfill window. Deletes are rejected. History older than the backfill window is immutable.
 
 ## Consequences
 

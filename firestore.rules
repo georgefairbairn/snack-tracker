@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// These rules are the ONLY access control on this database. There is no
+// sign-in — see docs/adr/0003. Replacing any of this with `allow write: if true`
+// while debugging turns a bounded nuisance into total data loss. Don't.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A date key must be exactly YYYY-MM-DD before we try to parse it.
+    function wellFormedDate(d) {
+      return d.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function asTimestamp(d) {
+      return timestamp.date(int(d[0:4]), int(d[5:7]), int(d[8:10]));
+    }
+
+    // The backfill window is 3 days, but these rules run in UTC while Days are
+    // local and roll over at 4am. The extra slack absorbs that difference
+    // rather than rejecting a legitimate write near a boundary.
+    function insideBackfillWindow(d) {
+      return asTimestamp(d) > request.time - duration.value(5, 'd')
+          && asTimestamp(d) < request.time + duration.value(2, 'd');
+    }
+
+    function validRating(data, player) {
+      return !(player in data) || data[player] in ['red', 'yellow', 'green'];
+    }
+
+    // Only the two Players, only the three Ratings, nothing else in the document.
+    function validShape(data) {
+      return data.keys().hasOnly(['george', 'izzy'])
+          && data.keys().size() > 0
+          && validRating(data, 'george')
+          && validRating(data, 'izzy');
+    }
+
+    match /days/{date} {
+      allow read: if true;
+      allow create, update: if wellFormedDate(date)
+                            && insideBackfillWindow(date)
+                            && validShape(request.resource.data);
+      // History is immutable. Nothing is ever deleted.
+      allow delete: if false;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

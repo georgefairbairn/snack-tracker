@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0c10">
+<title>SNACK QUEST</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230c0c10'/><rect x='2' y='2' width='5' height='5' fill='%233ac04a'/><rect x='9' y='2' width='5' height='5' fill='%23f5c518'/><rect x='2' y='9' width='5' height='5' fill='%23e8402a'/><rect x='9' y='9' width='5' height='5' fill='%233ac04a'/></svg>">
+</head>
+<body>
+
+<div class="scanlines" aria-hidden="true"></div>
+
+<header class="topbar">
+  <h1 class="logo">
+    SNACK<span class="logo-quest">QUEST</span><button class="logo-secret" id="logoSecret" aria-label="?"></button>
+  </h1>
+  <p class="status" id="status">CONNECTING…</p>
+</header>
+
+<main>
+  <!-- ---------------- TODAY ---------------- -->
+  <section class="view" id="view-today">
+    <p class="day-label" id="dayLabel"></p>
+    <div class="players" id="players"></div>
+    <p class="hint" id="todayHint"></p>
+  </section>
+
+  <!-- ---------------- CALENDAR ---------------- -->
+  <section class="view" id="view-calendar" hidden>
+    <div class="month-nav">
+      <button class="navbtn" id="prevMonth" aria-label="Previous month">&lt;</button>
+      <span id="monthLabel"></span>
+      <button class="navbtn" id="nextMonth" aria-label="Next month">&gt;</button>
+    </div>
+    <div class="weekdays"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+    <div class="calendar" id="calendar"></div>
+    <div class="legend">
+      <span><i class="swatch top"></i> GEORGE (TOP)</span>
+      <span><i class="swatch bottom"></i> IZZY (BOTTOM)</span>
+      <span><i class="swatch unlogged"></i> UNLOGGED</span>
+    </div>
+  </section>
+
+  <!-- ---------------- SCORES ---------------- -->
+  <section class="view" id="view-scores" hidden>
+    <div class="scores" id="scores"></div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button class="tab is-active" data-view="today">TODAY</button>
+  <button class="tab" data-view="calendar">CALENDAR</button>
+  <button class="tab" data-view="scores">SCORES</button>
+</nav>
+
+<!-- Day editor, opened from the calendar for days inside the backfill window -->
+<div class="modal" id="editor" hidden>
+  <div class="modal-box">
+    <p class="modal-title" id="editorTitle"></p>
+    <div id="editorBody"></div>
+    <button class="btn-close" id="editorClose">CLOSE</button>
+  </div>
+</div>
+
+<!-- Easter eggs land here -->
+<div class="fx" id="fx" aria-hidden="true"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

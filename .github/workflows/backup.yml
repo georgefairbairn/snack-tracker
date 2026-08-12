@@ -1,0 +1,36 @@
+name: Nightly backup
+
+on:
+  schedule:
+    # 03:17 UTC — an odd minute so it isn't queued behind everyone else's
+    # on-the-hour jobs.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch ratings from Firestore
+        run: node scripts/backup.mjs
+
+      - name: Commit if anything changed
+        run: |
+          if git diff --quiet -- data/backup.json; then
+            echo "No changes to back up."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/backup.json
+          git commit -m "Nightly backup of ratings"
+          git push
