@@ -1,6 +1,8 @@
 import { currentDayKey, isEditable, toKey, fromKey, monthLabel } from './dates.js';
-import { computeScores, PLAYERS, RATINGS } from './scoring.js';
-import { collectionFor } from './animals.js';
+import {
+  computeScores, PLAYERS, RATINGS, BONUS_RUN_POINTS, BONUS_RUN_MIN, BONUS_RUN_MAX,
+} from './scoring.js';
+import { collectionFor, prizeFor } from './animals.js';
 import { spriteSVG, spriteName } from './sprites.js';
 import * as store from './store.js';
 
@@ -179,6 +181,8 @@ function renderToday() {
       <div class="player-meta">
         <span>STREAK <b>${s.streak}</b></span>
         <span class="mult">MULT <b>x${s.multiplier}</b></span>
+        <span>GREEN <b>${s.greenTotal}</b></span>
+        <span>WEEK <b>${s.weekRun}</b></span>
         <span>TODAY <b>${current ? RATING_TEXT[current] : '—'}</b></span>
       </div>
       ${choicesHTML(player, todayKey)}
@@ -193,11 +197,31 @@ function renderToday() {
 function todayHint() {
   const george = ratingOf(todayKey, 'george');
   const izzy = ratingOf(todayKey, 'izzy');
-  if (george === 'green' && izzy === 'green') return 'BOTH GREEN. +50 EACH.';
-  if (george && izzy) return 'BOTH IN FOR TODAY.';
-  if (george) return 'WAITING ON IZZY.';
-  if (izzy) return 'WAITING ON GEORGE.';
-  return 'HOW WAS TODAY?';
+  let line;
+  if (george === 'green' && izzy === 'green') line = 'BOTH GREEN. +50 EACH.';
+  else if (george && izzy) line = 'BOTH IN FOR TODAY.';
+  else if (george) line = 'WAITING ON IZZY.';
+  else if (izzy) line = 'WAITING ON GEORGE.';
+  else line = 'HOW WAS TODAY?';
+
+  const chase = bonusHint();
+  return chase ? `${line}<br>${chase}` : line;
+}
+
+/**
+ * What the next Bonus Run rung is worth, for whoever is closest to one. Only
+ * ever names one Player — two chases on a 7px line is noise, and the point is a
+ * nudge, not a scoreboard.
+ */
+function bonusHint() {
+  const chasing = PLAYERS
+    .filter((p) => scores[p].weekRun > 0 && scores[p].weekRun < BONUS_RUN_MAX)
+    .sort((a, b) => scores[b].weekRun - scores[a].weekRun)[0];
+  if (!chasing) return '';
+
+  const next = Math.max(BONUS_RUN_MIN, scores[chasing].weekRun + 1);
+  const away = next - scores[chasing].weekRun;
+  return `${LABELS[chasing]}: ${away} MORE GREEN THIS WEEK PAYS +${BONUS_RUN_POINTS[next]}`;
 }
 
 function renderCalendar() {
@@ -241,24 +265,32 @@ function renderCalendar() {
   $('nextMonth').disabled = new Date(viewYear, viewMonth, 1) >= thisMonth;
 }
 
+/** The live Bonus Run, as it reads on a scorecard. */
+function weekRunText(s) {
+  if (s.weekRun === 0) return '—';
+  if (s.weekRun >= BONUS_RUN_MAX) return `${s.weekRun} — MAXED`;
+  return `${s.weekRun} IN A ROW`;
+}
+
 function renderScores() {
   $('scores').innerHTML = PLAYERS.map((player) => {
     const s = scores[player];
-    const critters = collectionFor(player, s.milestonesHit);
+    const critters = collectionFor(player, s.greenTotal);
     const collection = critters.length
       ? `<div class="collection">${critters.map((c, i) => `
           <figure class="critter" style="--d:${i * 180}ms">${spriteSVG(c.key, { scale: 2 })}
             <figcaption>${spriteName(c.key)}</figcaption>
           </figure>`).join('')}</div>`
-      : '<p class="collection-empty">NO ANIMALS YET.<br>KEEP IT CLEAN FOR 3 DAYS AND ONE TURNS UP.</p>';
+      : '<p class="collection-empty">NO ANIMALS YET.<br>LOG 3 GREEN DAYS AND ONE TURNS UP.</p>';
 
     return `<div class="scorecard">
       <h2>${LABELS[player]}</h2>
       <div class="statline"><span>POINTS</span><b data-points="${player}">0</b></div>
+      <div class="statline"><span>GREEN DAYS</span><b>${s.greenTotal}</b></div>
       <div class="statline"><span>STREAK</span><b>${s.streak}</b></div>
       <div class="statline"><span>BEST STREAK</span><b>${s.bestStreak}</b></div>
       <div class="statline"><span>MULTIPLIER</span><b>x${s.multiplier}</b></div>
-      <div class="statline"><span>PERFECT WEEK</span><b>${s.perfectWeekAwarded ? 'YES' : 'NO'}</b></div>
+      <div class="statline"><span>THIS WEEK</span><b>${weekRunText(s)}</b></div>
       ${collection}
     </div>`;
   }).join('');
@@ -297,25 +329,53 @@ function celebrate(before) {
     const was = before[player];
     const now = scores[player];
 
-    if (now.milestonesHit.length > was.milestonesHit.length) {
-      const critters = collectionFor(player, now.milestonesHit);
-      const newest = critters[critters.length - 1];
-      if (newest) {
-        banner(`A WILD ${spriteName(newest.key)} APPEARS!`,
-          `${newest.tier} — FOUND BY ${LABELS[player]}`);
-        fx(spriteSVG(newest.key, { scale: 6, className: 'reveal' }), 2800);
-      }
-    } else if (now.multiplier > was.multiplier) {
-      banner('LEVEL UP!', `${LABELS[player]} IS ON x${now.multiplier} NOW`);
+    // Bonus Runs first: they are the loud part of the day, and the banner queue
+    // plays them in the order they are pushed.
+    for (const run of now.bonusRuns.slice(was.bonusRuns.length)) {
+      banner(`${run.length} IN A ROW!`, `${LABELS[player]} — BONUS RUN. +${run.points}`);
+      awardPrize(player, run);
     }
 
-    if (now.perfectWeekAwarded && !was.perfectWeekAwarded) {
-      banner('PERFECT WEEK!', `${LABELS[player]} — SEVEN IN A ROW. +500`);
+    const critters = collectionFor(player, now.greenTotal);
+    const had = collectionFor(player, was.greenTotal);
+    if (critters.length > had.length) {
+      const newest = critters[critters.length - 1];
+      banner(`A WILD ${spriteName(newest.key)} APPEARS!`,
+        `${newest.tier} — FOUND BY ${LABELS[player]}`);
+      fx(spriteSVG(newest.key, { scale: 6, className: 'reveal' }), 2800);
+    } else if (now.multiplier > was.multiplier) {
+      banner('LEVEL UP!', `${LABELS[player]} IS ON x${now.multiplier} NOW`);
     }
   }
 
   const bothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
   if (bothGreen && !previousBothGreen) banner('BOTH GREEN!', 'CO-OP BONUS. +50 EACH.');
+}
+
+// ---------------------------------------------------------------- prizes
+
+// How long each Prize entrance needs before it can be cleaned up. Must not be
+// shorter than the matching CSS animation or the sprite vanishes mid-lap.
+const PRIZE_MS = { hop: 3400, scurry: 3400, swim: 6200, reveal: 2800, parade: 5600 };
+
+/** Every day of a Bonus Run pays a Prize: an animal turns up, does a lap, leaves. */
+function awardPrize(player, run) {
+  const prize = prizeFor(player, run.week, run.length);
+  toast(`PRIZE FOR ${LABELS[player]}<br>${spriteName(prize.key)} DROPS BY`);
+
+  // The reduced-motion rule freezes every animation, so a Prize sprite would
+  // park itself on screen instead of crossing it. The toast carries the news.
+  if (reducedMotion) return;
+
+  if (prize.move === 'parade') {
+    const line = Array.from({ length: 5 }, (_, i) =>
+      `<span style="--i:${i}">${spriteSVG(prize.key, { scale: 3 })}</span>`).join('');
+    fx(`<div class="parade">${line}</div>`, PRIZE_MS.parade);
+    return;
+  }
+
+  const scale = prize.move === 'reveal' ? 6 : 4;
+  fx(spriteSVG(prize.key, { scale, className: prize.move }), PRIZE_MS[prize.move]);
 }
 
 // ---------------------------------------------------------------- easter eggs

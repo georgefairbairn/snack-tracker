@@ -1,25 +1,51 @@
 // A Milestone draws from a rarity tier rather than granting a fixed animal, so
 // the Milestone is known in advance but the animal is not. Draws are seeded
-// from the Player and the Milestone, making a Collection a pure function of
-// Rating history — nothing is stored. See docs/adr/0005.
+// from the Player and the tier, making a Collection a pure function of Rating
+// history — nothing is stored. See docs/adr/0005.
 
 export const TIER_POOLS = {
-  3: ['meerkat', 'tortoise', 'penguin', 'goat', 'pangolin'],
-  7: ['zebra', 'flamingo', 'octopus', 'toucan'],
-  14: ['elephant', 'tiger', 'orca', 'gorilla'],
-  30: ['bluewhale', 'whiterhino', 'giantpanda'],
+  COMMON: ['meerkat', 'tortoise', 'penguin', 'goat', 'pangolin'],
+  UNCOMMON: ['zebra', 'flamingo', 'octopus', 'toucan'],
+  RARE: ['elephant', 'tiger', 'orca', 'gorilla'],
+  LEGENDARY: ['bluewhale', 'whiterhino', 'giantpanda'],
 };
 
-export const TIER_LABELS = {
-  3: 'COMMON',
-  7: 'UNCOMMON',
-  14: 'RARE',
-  30: 'LEGENDARY',
-};
+// Tiers were once keyed by the Streak length that unlocked them, and the draw
+// seed was built from that number. Milestones now count cumulative green Days
+// instead (see docs/adr/0006), but the seeds keep the old numbers: change them
+// and every animal already unlocked silently becomes a different animal.
+const TIER_SEEDS = { COMMON: '3', UNCOMMON: '7', RARE: '14', LEGENDARY: '30' };
 
 // IMPORTANT: tiers may only ever be appended to. Reordering or removing an
 // entry retroactively changes which animals Players have already unlocked,
 // because the Collection is derived rather than stored.
+
+// Cumulative green Days that award an animal, and the tier each one draws from.
+// Sixteen rungs for sixteen animals, so the ladder ends exactly when the pools
+// are exhausted. The four rungs that were the old Streak Milestones — 3, 7, 14
+// and 30 — keep the tier they had, because a Player who reached a Streak of N
+// necessarily has N green Days, so nobody loses an animal they already had.
+//
+// Append-only, like the pools, and for the same reason: inserting a rung shifts
+// every later draw of that tier by one.
+export const LADDER = [
+  { greens: 3, tier: 'COMMON' },
+  { greens: 5, tier: 'COMMON' },
+  { greens: 7, tier: 'UNCOMMON' },
+  { greens: 10, tier: 'COMMON' },
+  { greens: 14, tier: 'RARE' },
+  { greens: 18, tier: 'UNCOMMON' },
+  { greens: 22, tier: 'COMMON' },
+  { greens: 26, tier: 'COMMON' },
+  { greens: 30, tier: 'LEGENDARY' },
+  { greens: 36, tier: 'UNCOMMON' },
+  { greens: 44, tier: 'RARE' },
+  { greens: 55, tier: 'UNCOMMON' },
+  { greens: 70, tier: 'RARE' },
+  { greens: 90, tier: 'LEGENDARY' },
+  { greens: 120, tier: 'RARE' },
+  { greens: 150, tier: 'LEGENDARY' },
+];
 
 function xmur3(str) {
   let h = 1779033703 ^ str.length;
@@ -58,46 +84,85 @@ function seededShuffle(items, seed) {
 // survives a rename, and it is obvious to the next reader that it is deliberate.
 // Everything after the first draw follows the shuffle as normal.
 const PINNED_FIRST = { izzy: 'pangolin' };
-const FIRST_MILESTONE = Math.min(...Object.keys(TIER_POOLS).map(Number));
+const FIRST_TIER = 'COMMON';
 
 /** The full order a Player will draw a tier in — a permutation, so no repeats. */
-function orderFor(player, milestone) {
-  const pool = TIER_POOLS[milestone];
+function orderFor(player, tier) {
+  const pool = TIER_POOLS[tier];
   if (!pool) return null;
-  const shuffled = seededShuffle(pool, `${player}:${milestone}`);
+  const shuffled = seededShuffle(pool, `${player}:${TIER_SEEDS[tier]}`);
   const pinned = PINNED_FIRST[player];
-  if (milestone === FIRST_MILESTONE && pinned && shuffled.includes(pinned)) {
+  if (tier === FIRST_TIER && pinned && shuffled.includes(pinned)) {
     return [pinned, ...shuffled.filter((animal) => animal !== pinned)];
   }
   return shuffled;
 }
 
 /**
- * Which animal a Player gets the `occurrence`-th time they reach `milestone`.
- * Draws walk a seeded shuffle of the tier, so a Player never repeats an animal
- * until the whole tier is exhausted.
+ * Which animal a Player gets the `occurrence`-th time they draw `tier`. Draws
+ * walk a seeded shuffle of the tier, so a Player never repeats an animal until
+ * the whole tier is exhausted.
  */
-export function drawFor(player, milestone, occurrence) {
-  const order = orderFor(player, milestone);
+export function drawFor(player, tier, occurrence) {
+  const order = orderFor(player, tier);
   return order ? order[occurrence % order.length] : null;
 }
 
+/** The rungs of the ladder a Player's green Day total has passed. */
+export function milestonesFor(greenTotal) {
+  return LADDER.filter((rung) => greenTotal >= rung.greens);
+}
+
 /**
- * Derives a Player's Collection from the Milestones their Rating history hit.
- * Deduplicated and in the order first earned — a Collection is a set, and only
- * unlocked animals are ever shown.
+ * Derives a Player's Collection from their cumulative green Days. Deduplicated
+ * and in the order first earned — a Collection is a set, and only unlocked
+ * animals are ever shown.
  */
-export function collectionFor(player, milestonesHit) {
+export function collectionFor(player, greenTotal) {
   const seen = new Set();
   const counts = new Map();
   const out = [];
-  for (const milestone of milestonesHit) {
-    const occurrence = counts.get(milestone) ?? 0;
-    counts.set(milestone, occurrence + 1);
-    const key = drawFor(player, milestone, occurrence);
+  for (const rung of milestonesFor(greenTotal)) {
+    const occurrence = counts.get(rung.tier) ?? 0;
+    counts.set(rung.tier, occurrence + 1);
+    const key = drawFor(player, rung.tier, occurrence);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    out.push({ key, milestone, tier: TIER_LABELS[milestone] });
+    out.push({ key, greens: rung.greens, tier: rung.tier });
   }
   return out;
+}
+
+// ---------------------------------------------------------------- prizes
+
+// A Prize is what each day of a Bonus Run pays out on top of the points: an
+// animal turns up, does one lap and leaves. It is never collected, which is why
+// the pool can be every animal regardless of what a Player has unlocked — seeing
+// a blue whale here is a tease, not a spoiler, and it cannot be mistaken for an
+// unlock because nothing joins the Collection afterwards.
+//
+// Derived from the tiers rather than listed again, so a new animal is a Prize
+// automatically. Safe to let drift, unlike a draw: a Prize is shown once, at the
+// moment it is earned, and never recomputed from history.
+//
+// The hippo and the mouse are deliberately absent. The hippo is what a red Day
+// summons and the mouse is a Secret; handing either out as a reward would blunt
+// both of them.
+const PRIZE_POOL = Object.values(TIER_POOLS).flat();
+
+// How a Prize arrives, escalating with the length of the run so the seventh day
+// is visibly bigger than the third.
+const PRIZE_MOVES = { 3: 'hop', 4: 'scurry', 5: 'swim', 6: 'reveal', 7: 'parade' };
+
+/**
+ * The Prize for reaching `length` green Days in a row during the week starting
+ * `week`. Seeded on the Player and the week, so the five days of one week bring
+ * five different animals and next week brings a different five.
+ */
+export function prizeFor(player, week, length) {
+  const order = seededShuffle(PRIZE_POOL, `prize:${player}:${week}`);
+  return {
+    key: order[length % order.length],
+    move: PRIZE_MOVES[length] ?? 'hop',
+  };
 }

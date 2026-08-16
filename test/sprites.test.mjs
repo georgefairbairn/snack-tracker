@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPRITES, SPRITE_SIZE, spriteSVG } from '../js/sprites.js';
-import { TIER_POOLS, drawFor, collectionFor } from '../js/animals.js';
+import { TIER_POOLS, LADDER, drawFor, collectionFor, milestonesFor } from '../js/animals.js';
 
 test('every sprite row is exactly the sprite width', () => {
   for (const [key, sprite] of Object.entries(SPRITES)) {
@@ -27,11 +27,62 @@ test('every sprite pixel maps to a colour in its palette', () => {
 });
 
 test('every animal referenced by a tier actually exists', () => {
-  for (const [milestone, pool] of Object.entries(TIER_POOLS)) {
+  for (const [tier, pool] of Object.entries(TIER_POOLS)) {
     for (const key of pool) {
-      assert.ok(key in SPRITES, `tier ${milestone} references missing sprite '${key}'`);
+      assert.ok(key in SPRITES, `tier ${tier} references missing sprite '${key}'`);
     }
   }
+});
+
+test('the ladder climbs, and every rung names a real tier', () => {
+  for (let i = 1; i < LADDER.length; i++) {
+    assert.ok(LADDER[i].greens > LADDER[i - 1].greens,
+      `rung ${i} does not come after the one before it`);
+  }
+  for (const rung of LADDER) {
+    assert.ok(rung.tier in TIER_POOLS, `rung ${rung.greens} names an unknown tier`);
+  }
+});
+
+test('the ladder has exactly one rung per animal', () => {
+  const animals = Object.values(TIER_POOLS).reduce((n, pool) => n + pool.length, 0);
+  assert.equal(LADDER.length, animals,
+    'a short ladder strands animals; a long one draws duplicates that get deduplicated away');
+
+  for (const [tier, pool] of Object.entries(TIER_POOLS)) {
+    const rungs = LADDER.filter((r) => r.tier === tier).length;
+    assert.equal(rungs, pool.length, `${tier} has ${rungs} rungs for ${pool.length} animals`);
+  }
+});
+
+test('the whole ladder unlocks every animal exactly once', () => {
+  const last = LADDER[LADDER.length - 1].greens;
+  for (const player of ['george', 'izzy']) {
+    const keys = collectionFor(player, last).map((c) => c.key);
+    assert.equal(keys.length, new Set(keys).size, `${player} unlocked a duplicate`);
+    assert.equal(new Set(keys).size,
+      Object.values(TIER_POOLS).reduce((n, pool) => n + pool.length, 0),
+      `${player} did not reach every animal`);
+  }
+});
+
+test('the old streak milestones keep their tiers, so nobody loses an animal', () => {
+  // Animals used to come from a Streak of 3, 7, 14 or 30. A Player with a
+  // Streak of N has at least N green Days, so leaving those four rungs on their
+  // original tiers makes every collection earned under the old rules a prefix
+  // of the collection earned under these ones. See docs/adr/0006.
+  const tierAt = (greens) => LADDER.find((r) => r.greens === greens)?.tier;
+  assert.equal(tierAt(3), 'COMMON');
+  assert.equal(tierAt(7), 'UNCOMMON');
+  assert.equal(tierAt(14), 'RARE');
+  assert.equal(tierAt(30), 'LEGENDARY');
+});
+
+test('milestones are the rungs already passed', () => {
+  assert.deepEqual(milestonesFor(0), []);
+  assert.deepEqual(milestonesFor(2), []);
+  assert.deepEqual(milestonesFor(3), [{ greens: 3, tier: 'COMMON' }]);
+  assert.equal(milestonesFor(6).length, 2, '3 and 5, not 7');
 });
 
 test('sprites render to svg without a fill for transparent pixels', () => {
@@ -41,53 +92,65 @@ test('sprites render to svg without a fill for transparent pixels', () => {
   assert.ok(!svg.includes('fill="undefined"'));
 });
 
-test('a draw is stable for the same player, milestone and occurrence', () => {
-  const a = drawFor('george', 7, 0);
-  const b = drawFor('george', 7, 0);
+test('a draw is stable for the same player, tier and occurrence', () => {
+  const a = drawFor('george', 'UNCOMMON', 0);
+  const b = drawFor('george', 'UNCOMMON', 0);
   assert.equal(a, b, 'collections are derived, so draws must never move');
 });
 
 test('players draw independently', () => {
-  const georges = [0, 1, 2, 3].map((i) => drawFor('george', 3, i));
-  const izzys = [0, 1, 2, 3].map((i) => drawFor('izzy', 3, i));
+  const georges = [0, 1, 2, 3].map((i) => drawFor('george', 'COMMON', i));
+  const izzys = [0, 1, 2, 3].map((i) => drawFor('izzy', 'COMMON', i));
   assert.notDeepEqual(georges, izzys, 'both players drawing the same order would be a bug');
 });
 
 test('izzy\'s first animal is always the pangolin', () => {
-  assert.equal(drawFor('izzy', 3, 0), 'pangolin');
-  assert.equal(collectionFor('izzy', [3])[0].key, 'pangolin');
+  assert.equal(drawFor('izzy', 'COMMON', 0), 'pangolin');
+  assert.equal(collectionFor('izzy', 3)[0].key, 'pangolin');
 });
 
 test('the pin only affects izzy\'s first draw, not the rest', () => {
-  const pool = TIER_POOLS[3];
-  const izzy = pool.map((_, i) => drawFor('izzy', 3, i));
+  const pool = TIER_POOLS.COMMON;
+  const izzy = pool.map((_, i) => drawFor('izzy', 'COMMON', i));
   assert.equal(izzy[0], 'pangolin');
   assert.equal(new Set(izzy).size, pool.length, 'still a full permutation, no repeats');
   assert.equal(izzy.filter((a) => a === 'pangolin').length, 1, 'pangolin appears once');
 });
 
 test('george is not pinned', () => {
-  const drawn = TIER_POOLS[3].map((_, i) => drawFor('george', 3, i));
-  assert.equal(new Set(drawn).size, TIER_POOLS[3].length);
-  assert.notEqual(drawn[0], drawFor('izzy', 3, 0), 'the two players should not open the same');
+  const drawn = TIER_POOLS.COMMON.map((_, i) => drawFor('george', 'COMMON', i));
+  assert.equal(new Set(drawn).size, TIER_POOLS.COMMON.length);
+  assert.notEqual(drawn[0], drawFor('izzy', 'COMMON', 0),
+    'the two players should not open the same');
 });
 
 test('a tier is exhausted before any animal repeats', () => {
-  const pool = TIER_POOLS[3];
-  const drawn = pool.map((_, i) => drawFor('george', 3, i));
+  const pool = TIER_POOLS.COMMON;
+  const drawn = pool.map((_, i) => drawFor('george', 'COMMON', i));
   assert.equal(new Set(drawn).size, pool.length, 'no repeats within one pass');
-  assert.equal(drawFor('george', 3, pool.length), drawn[0], 'wraps around after exhausting');
+  assert.equal(drawFor('george', 'COMMON', pool.length), drawn[0],
+    'wraps around after exhausting');
 });
 
 test('a collection is deduplicated and in the order first earned', () => {
-  // Hit the 3-day milestone three times and the 7-day once.
-  const collection = collectionFor('george', [3, 7, 3, 3]);
+  const collection = collectionFor('george', 10); // rungs 3, 5 and 7
   const keys = collection.map((c) => c.key);
   assert.equal(new Set(keys).size, keys.length, 'no duplicates');
-  assert.equal(collection[1].milestone, 7, 'order follows when each was earned');
-  assert.equal(collection[1].tier, 'UNCOMMON');
+  assert.deepEqual(collection.map((c) => c.greens), [3, 5, 7, 10],
+    'order follows when each was earned');
+  assert.equal(collection[2].tier, 'UNCOMMON');
+});
+
+test('a collection only ever grows as green days accumulate', () => {
+  let previous = [];
+  for (let greens = 0; greens <= 160; greens++) {
+    const keys = collectionFor('george', greens).map((c) => c.key);
+    assert.deepEqual(keys.slice(0, previous.length), previous,
+      `the collection at ${greens} green days is not an extension of the one before it`);
+    previous = keys;
+  }
 });
 
 test('an empty history unlocks nothing', () => {
-  assert.deepEqual(collectionFor('izzy', []), []);
+  assert.deepEqual(collectionFor('izzy', 0), []);
 });

@@ -64,6 +64,34 @@ async function open(days = {}, options = {}) {
 const readStore = (page) =>
   page.evaluate(() => JSON.parse(localStorage.getItem('snack-tracker-days') || '{}'));
 
+/**
+ * Waits for a banner matching `pattern`. Banners queue rather than stack — one
+ * tap can raise a bonus run, an animal and a co-op bonus — so a test must not
+ * assume which one is on screen first.
+ */
+async function waitForBanner(page, pattern, timeout = 9000) {
+  const seen = new Set();
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    for (const text of await page.locator('.banner').allTextContents()) seen.add(text);
+    for (const text of seen) if (pattern.test(text)) return text;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`no banner matched ${pattern}; saw ${JSON.stringify([...seen])}`);
+}
+
+const mondayIndex = (offset) => (new Date(dayKey(offset).replace(/-/g, '/')).getDay() + 6) % 7;
+
+/**
+ * The most recent day that is still editable and has its two preceding days in
+ * the same Mon-Sun week — the only place a three-day Bonus Run can be completed
+ * by hand. Which of the three it is depends on what day the suite runs.
+ */
+function bonusRunDay() {
+  const offset = [0, 1, 2].find((n) => mondayIndex(n) >= 2);
+  return { offset, key: dayKey(offset), today: offset === 0 };
+}
+
 test('a plain page load celebrates nothing', async () => {
   // A history that has already earned animals must not replay them on load.
   const page = await open({
@@ -156,9 +184,11 @@ test('nothing overflows sideways on a phone', async () => {
   await page.close();
 });
 
-test('reaching a milestone unlocks an animal, with points rolling up', async () => {
+test('a third green day unlocks an animal, with points rolling up', async () => {
+  // Animals come from cumulative green days, not from a streak, so any three
+  // greens do it — they do not have to be consecutive.
   const page = await open({
-    [dayKey(2)]: { george: 'green' },
+    [dayKey(9)]: { george: 'green' },
     [dayKey(1)]: { george: 'green' },
   });
   await page.click('.choice[data-player="george"][data-r="green"]');
@@ -173,10 +203,45 @@ test('reaching a milestone unlocks an animal, with points rolling up', async () 
   });
   assert.ok(distinct > 3, `points should roll up, saw ${distinct} values`);
 
-  await page.waitForTimeout(400);
-  const banner = await page.locator('.banner').first().textContent();
-  assert.match(banner, /A WILD \w+ APPEARS!/);
+  await waitForBanner(page, /A WILD \w+ APPEARS!/);
   assert.ok(await page.locator('#fx svg.reveal').count() > 0);
+  await page.close();
+});
+
+test('three green days in one week pay a bonus run and drop a prize', async () => {
+  const target = bonusRunDay();
+  const page = await open({
+    [dayKey(target.offset + 2)]: { george: 'green' },
+    [dayKey(target.offset + 1)]: { george: 'green' },
+  });
+
+  if (target.today) {
+    await page.click('.choice[data-player="george"][data-r="green"]');
+  } else {
+    await page.click('.tab[data-view="calendar"]');
+    await page.waitForTimeout(300);
+    await page.click(`[data-open="${target.key}"]`);
+    await page.click('#editorBody .choice[data-player="george"][data-r="green"]');
+  }
+
+  const banner = await waitForBanner(page, /3 IN A ROW!/);
+  assert.match(banner, /BONUS RUN\. \+150/);
+  assert.match(await page.locator('.toast').first().textContent(), /PRIZE FOR GEORGE/);
+  assert.ok(await page.locator('#fx svg.hop').count() > 0, 'the prize should hop in');
+  await page.close();
+});
+
+test('a bonus run is not paid twice for the same length in one week', async () => {
+  // The prize and the bonus already landed in history, so re-rendering must not
+  // replay them: a page load celebrates nothing (see the first test).
+  const target = bonusRunDay();
+  const page = await open({
+    [dayKey(target.offset + 2)]: { george: 'green' },
+    [dayKey(target.offset + 1)]: { george: 'green' },
+    [target.key]: { george: 'green' },
+  });
+  assert.equal(await page.locator('.banner').count(), 0);
+  assert.equal(await page.locator('#fx svg').count(), 0);
   await page.close();
 });
 

@@ -45,8 +45,29 @@ The multiplier climbs with the Streak — ×2 at 3 days, then 5, 7, 10, 14, 21 a
 30, up to ×8. A green pays at the multiplier you had *before* it, so reaching a
 new tier pays out from the next day.
 
-Two bonuses: **CO-OP BONUS**, +50 each on any day both Players are green, and
-**PERFECT WEEK**, +500 the first time a Player strings together seven greens.
+**CO-OP BONUS** pays +50 each on any day both Players are green.
+
+**BONUS RUNS** pay for green days in a row inside a single week, Monday to
+Sunday:
+
+| Green days in a row | Bonus | Running total |
+| --- | --- | --- |
+| 3 | +150 | 150 |
+| 4 | +250 | 400 |
+| 5 | +400 | 800 |
+| 6 | +600 | 1,400 |
+| 7 | +1,000 | 2,400 |
+
+Every rung pays, so a fully green week collects all five. Each length pays at
+most once per week, and nothing carries across Monday — break a run on Tuesday
+and you are three days from the next bonus, not locked out until next week. Each
+day of a Bonus Run also drops a **Prize**: an animal turns up, does a lap of the
+screen and leaves. Prizes are not collected, so a Prize can be any animal,
+including ones you have not unlocked.
+
+Yellow breaks a Bonus Run even though it holds a Streak. A Bonus Run is green
+days in a row and nothing shields it — otherwise yellow would be the better
+button to press on a green day.
 
 Yellow shielding a Streak is deliberate. If a yellow ended a run exactly like a
 red, then on day 20 with one biscuit eaten you would simply log green — and the
@@ -60,19 +81,30 @@ days before it**; older days lock as Unlogged and end a Streak.
 
 ## Animals
 
-Reaching a Streak of 3, 7, 14 or 30 days unlocks an animal drawn at random from
-that rarity tier. Each Player draws separately, so your collections will differ.
-Only unlocked animals are ever shown — no grey silhouettes, because visible empty
-slots turn a surprise into a checklist.
+Animals come from **cumulative green days**, counted for good. Every green day
+you have ever logged counts, and a red never takes any of them away. Reaching 3,
+5, 7, 10, 14 green days and on up the ladder in
+[`js/animals.js`](./js/animals.js) unlocks an animal drawn at random from that
+rung's rarity tier. Sixteen rungs for sixteen animals; the last lands at 150.
 
-Draws are seeded from the Player and the milestone, so a Collection is a pure
-function of Rating history and is never stored. One exception: Izzy's first
-animal is pinned to the pangolin. Everything after it is drawn normally.
+Streaks used to gate the animals and it made a single bad day cost everything,
+which is exactly the pressure that stops someone logging honestly. A red still
+costs the Streak, the Multiplier and the points — it just no longer erases
+progress towards the Collection. See
+[ADR 0006](./docs/adr/0006-animals-come-from-cumulative-green-days.md).
 
-**Animal tiers in [`js/animals.js`](./js/animals.js) may only be appended to** —
-reordering one retroactively changes which animals you have already unlocked.
-That constraint is free to break right now, before anyone has a Streak, and
-expensive the moment someone does.
+Each Player draws separately, so your collections will differ. Only unlocked
+animals are ever shown — no grey silhouettes, because visible empty slots turn a
+surprise into a checklist.
+
+Draws are seeded from the Player and the tier, so a Collection is a pure function
+of Rating history and is never stored. One exception: Izzy's first animal is
+pinned to the pangolin. Everything after it is drawn normally.
+
+**The tiers and the ladder in [`js/animals.js`](./js/animals.js) may only be
+appended to** — reordering either retroactively changes which animals you have
+already unlocked. `npm test` asserts that a Collection only ever grows as green
+days accumulate, which is the property that keeps this honest.
 
 There are also easter eggs that are not milestones. They are not documented
 here. That is the point of them.
@@ -81,8 +113,12 @@ here. That is the point of them.
 
 Scores roll up rather than snapping, greens throw pixel confetti, a red shakes
 the cabinet, reaching a new multiplier tier or unlocking an animal raises a
-banner, and the calendar cascades in when you change month. Banners queue rather
-than stack, since a level-up and a co-op bonus can land on the same tap.
+banner, and the calendar cascades in when you change month. Each day of a Bonus
+Run sends a Prize across the screen, getting bigger as the run gets longer — a
+hop, a scurry, a swim, a full-screen reveal, and a parade on the seventh.
+
+Banners queue rather than stack, since one tap can raise a bonus run, an animal
+and a co-op bonus at once.
 
 All of it is suppressed under `prefers-reduced-motion: reduce`, including the
 starfield — that is a real setting people turn on for real reasons, not a

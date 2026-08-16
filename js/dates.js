@@ -44,6 +44,14 @@ export function range(start, end) {
   return out;
 }
 
+// The Monday of the week a Day falls in, as a date key. Weeks run Monday to
+// Sunday to match the calendar, and a Bonus Run never carries across the
+// boundary — Sunday-then-Monday is two weeks, not a run of two.
+export function weekStartKey(key) {
+  const back = (fromKey(key).getDay() + 6) % 7; // Monday-first
+  return addDays(key, -back);
+}
+
 // A Day still open for editing: today, or within the backfill window. Future
 // days are never editable.
 export function isEditable(key, todayKey) {

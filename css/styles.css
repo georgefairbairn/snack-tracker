@@ -501,6 +501,48 @@ main { padding: 4px 10px 20px; max-width: 560px; margin: 0 auto; }
   to { transform: translateX(-80px) scaleX(-1) }
 }
 
+/* ---------------- bonus run prizes ---------------- */
+/* One entrance per rung of a Bonus Run, getting bigger as the run gets longer:
+   hop, scurry, swim, reveal, parade. The first four ride the existing easter-egg
+   animations; these two are new. */
+
+/* Horizontal travel and the bounce are separate animations on purpose — one
+   linear, one stepped — so the hop reads as hops rather than a slide. */
+.hop {
+  bottom: 84px;
+  left: -80px;
+  animation: hop-across 3.2s linear forwards, hop-bounce 640ms steps(4) 5;
+}
+@keyframes hop-across {
+  from { left: -80px }
+  to { left: 105vw }
+}
+@keyframes hop-bounce {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-28px) }
+}
+
+/* Seven greens in a week gets a whole line of them. */
+.parade {
+  position: absolute;
+  bottom: 76px;
+  left: 0;
+  display: flex;
+  gap: 10px;
+  animation: parade-march 5.4s linear forwards;
+}
+/* `.fx svg` is absolutely positioned, which would collapse the row. */
+.parade svg { position: static; }
+.parade span {
+  display: block;
+  animation: bob 700ms steps(2) infinite;
+  animation-delay: calc(var(--i) * 120ms);
+}
+@keyframes parade-march {
+  from { transform: translateX(-100%) }
+  to { transform: translateX(105vw) }
+}
+
 .toast {
   position: fixed;
   left: 50%;
