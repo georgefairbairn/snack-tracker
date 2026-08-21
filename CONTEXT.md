@@ -13,8 +13,12 @@ The unit a Rating attaches to. A Day runs from 4am to 4am local time, not midnig
 _Avoid_: date, session, 24 hours
 
 **Rating**:
-The single red, yellow or green judgement a Player records for one day. Red means they ate something properly bad, yellow something mildly bad, green nothing bad. The colour is the whole record — there is no underlying list of what was eaten.
+The single red, yellow or green judgement a Player records for one day. Red means they ate something properly bad, yellow something mildly bad, green nothing bad. The colour is the whole judgement — a Rating is complete on its own, and any Culprits recorded alongside it are optional detail that changes nothing.
 _Avoid_: score, status, entry, log
+
+**Culprit**:
+A category of food or drink recorded against a yellow or red Rating: sweet treat, savoury treat, take out, alcohol, eating out, fizzy drink. Optional, never required to finish a Day, and never scored. A Day can have several, or none. Green Days have none by definition, and turning a Day green drops any it had.
+_Avoid_: tag, reason, snack, food, category
 
 **Points**:
 The running numeric total a Player accumulates from their Ratings. Each Player's total is tracked separately.

@@ -19,7 +19,9 @@ Firebase console before it works:
 1. **Create the Firestore database.** Firestore → Create database → production
    mode. Any region.
 2. **Publish the Security Rules.** Copy [`firestore.rules`](./firestore.rules)
-   into Firestore → Rules → Publish.
+   into Firestore → Rules → Publish. Republish whenever that file changes — the
+   rules validate the exact shape of a day document, so a version that predates
+   Culprits will silently reject every attempt to record one.
 
 Until step 2 is done the database is wide open. The site will appear to work
 either way, so it is worth confirming.
@@ -79,6 +81,27 @@ A Day runs **4am to 4am local time**, because the 11pm crisps are exactly what
 this is built to catch. Ratings can be set or corrected for **today and the two
 days before it**; older days lock as Unlogged and end a Streak.
 
+## What was it
+
+Once a yellow or red is down, the day offers a second, optional question: what
+was it? Tap any of **SWEET TREAT**, **SAVOURY TREAT**, **TAKE OUT**,
+**ALCOHOL**, **EATING OUT** and **FIZZY DRINK** — as many as apply, or none.
+Green days are never asked, and turning a day green drops whatever it had.
+
+**Culprits are worth no points and cost none.** They do not touch the Streak,
+the Multiplier, Bonus Runs or the ladder to the next animal, and `npm test`
+asserts that the same history scores identically with and without them. A day
+that was one beer has to be as cheap to record honestly as a day that was
+nothing in particular, or the honest answer starts costing something — which is
+the one failure this tracker cannot survive. See
+[ADR 0007](./docs/adr/0007-culprits-are-recorded-but-never-scored.md).
+
+The payoff is on the scores card: **WHAT GETS YOU**, a running total of what
+each Player has actually recorded, commonest first. The categories live in
+[`js/culprits.js`](./js/culprits.js) and may be reordered or appended to freely,
+but a key may never be renamed — it is what every day already recorded points
+at.
+
 ## Animals
 
 Animals come from **cumulative green days**, counted for good. Every green day
@@ -124,12 +147,15 @@ All of it is suppressed under `prefers-reduced-motion: reduce`, including the
 starfield — that is a real setting people turn on for real reasons, not a
 checkbox.
 
-Two things to know if you touch the CSS. Animation rules live at the end of the
-stylesheet, so **never restate `position` on an element that is already
+Three things to know if you touch the CSS. Animation rules live at the end of
+the stylesheet, so **never restate `position` on an element that is already
 `fixed`** — doing so once dropped the tab bar out of the viewport into the page
-flow. And `[hidden] { display: none !important }` near the top is load-bearing:
+flow. `[hidden] { display: none !important }` near the top is load-bearing:
 without it `.modal { display: flex }` wins, and an invisible modal covers the
-page and swallows every tap.
+page and swallows every tap. And `.modal-box` carries `max-height: 100%` with
+`overflow-y: auto` because the centring flexbox around it overflows in both
+directions — drop either and a tall day editor pushes CLOSE off the bottom of a
+small phone with no way to scroll to it.
 
 ## Why not a Game Boy palette
 

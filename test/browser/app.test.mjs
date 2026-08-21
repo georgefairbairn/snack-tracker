@@ -36,8 +36,15 @@ after(async () => {
   http?.close();
 });
 
+/**
+ * The Day `offset` days before the one the app considers today. A Day runs 4am
+ * to 4am (js/dates.js), so between midnight and 4am the app's today is still
+ * yesterday's date — without that shift every test seeding "today" seeds a Day
+ * the app has not reached, and the whole suite fails for four hours a night.
+ */
 const dayKey = (offset) => {
   const d = new Date();
+  d.setHours(d.getHours() - 4);
   d.setDate(d.getDate() - offset);
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -173,7 +180,11 @@ test('the tab bar stays pinned to the bottom of the viewport', async () => {
 });
 
 test('nothing overflows sideways on a phone', async () => {
-  const page = await open({ [dayKey(1)]: { george: 'green', izzy: 'red' } });
+  // Today is red for Izzy so the culprit picker is on screen for this check.
+  const page = await open({
+    [dayKey(1)]: { george: 'green', izzy: 'red' },
+    [dayKey(0)]: { izzy: 'red', izzyCulprits: ['sweet', 'eatingout'] },
+  });
   for (const view of ['today', 'calendar', 'scores']) {
     await page.click(`.tab[data-view="${view}"]`);
     await page.waitForTimeout(250);
@@ -264,6 +275,99 @@ test('the starfield renders and can never intercept a tap', async () => {
 test('reduced motion suppresses the decoration', async () => {
   const page = await open({}, { reducedMotion: 'reduce' });
   assert.equal(await page.locator('.star').count(), 0);
+  await page.close();
+});
+
+test('the culprit picker appears on a yellow and never on a green', async () => {
+  const page = await open();
+  assert.equal(await page.locator('.player .culprits').count(), 0,
+    'an unrated day must ask for a colour before it asks what was eaten');
+
+  await page.click('.choice[data-player="george"][data-r="yellow"]');
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('.culprit[data-player="george"]').count(), 6);
+  assert.equal(await page.locator('.culprit[data-player="izzy"]').count(), 0);
+
+  await page.click('.choice[data-player="george"][data-r="green"]');
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('.culprit[data-player="george"]').count(), 0);
+  await page.close();
+});
+
+test('a culprit persists, toggles back off, and is cleared by a green', async () => {
+  const page = await open({ [dayKey(0)]: { izzy: 'red' } });
+
+  await page.click('.culprit[data-player="izzy"][data-c="takeout"]');
+  await page.click('.culprit[data-player="izzy"][data-c="fizzy"]');
+  await page.waitForTimeout(400);
+  assert.deepEqual((await readStore(page))[dayKey(0)].izzyCulprits, ['takeout', 'fizzy']);
+  assert.equal(
+    await page.locator('.culprit[data-player="izzy"][data-c="takeout"]').getAttribute('aria-pressed'),
+    'true');
+
+  await page.click('.culprit[data-player="izzy"][data-c="takeout"]');
+  await page.waitForTimeout(400);
+  assert.deepEqual((await readStore(page))[dayKey(0)].izzyCulprits, ['fizzy']);
+
+  // Turning the day green drops the culprits with it — a green day owns up to
+  // nothing, and a stale list would outlive the rating it belonged to.
+  await page.click('.choice[data-player="izzy"][data-r="green"]');
+  await page.waitForTimeout(400);
+  assert.equal((await readStore(page))[dayKey(0)].izzyCulprits, undefined);
+  await page.close();
+});
+
+test('a backfilled day can be told what was eaten from the calendar', async () => {
+  const page = await open({ [dayKey(2)]: { george: 'yellow' } });
+  await page.click('.tab[data-view="calendar"]');
+  await page.waitForTimeout(300);
+  await page.click(`[data-open="${dayKey(2)}"]`);
+
+  await page.click('#editorBody .culprit[data-player="george"][data-c="alcohol"]');
+  await page.waitForTimeout(400);
+  assert.deepEqual((await readStore(page))[dayKey(2)].georgeCulprits, ['alcohol']);
+  await page.close();
+});
+
+test('the day editor stays inside the viewport on a small phone', async () => {
+  // Regression: two culprit pickers make the editor taller than a 568px phone,
+  // and a centred flexbox pushed both the title and the CLOSE button off the
+  // ends of the screen with no way to scroll back to either.
+  const page = await open({ [dayKey(1)]: { george: 'red', izzy: 'yellow' } },
+    { viewport: { width: 320, height: 568 } });
+  await page.click('.tab[data-view="calendar"]');
+  await page.waitForTimeout(300);
+  await page.click(`[data-open="${dayKey(1)}"]`);
+  await page.waitForTimeout(300);
+
+  const box = await page.evaluate(() => {
+    const el = document.querySelector('.modal-box');
+    const r = el.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, viewport: window.innerHeight };
+  });
+  assert.ok(box.top >= -1, `editor top is off screen at ${box.top}`);
+  assert.ok(box.bottom <= box.viewport + 1,
+    `editor bottom is off screen at ${box.bottom} of ${box.viewport}`);
+
+  await page.click('#editorClose');
+  assert.equal(await page.locator('#editor').isVisible(), false);
+  await page.close();
+});
+
+test('the scores view totals what has actually been eaten', async () => {
+  const page = await open({
+    [dayKey(3)]: { george: 'red', georgeCulprits: ['sweet', 'alcohol'] },
+    [dayKey(2)]: { george: 'yellow', georgeCulprits: ['sweet'] },
+    [dayKey(1)]: { izzy: 'green' },
+  });
+  await page.click('.tab[data-view="scores"]');
+  await page.waitForTimeout(300);
+
+  const rows = await page.locator('.scorecard').first().locator('.culprit-totals .statline')
+    .allTextContents();
+  assert.deepEqual(rows, ['SWEET TREAT2', 'ALCOHOL1']);
+  // Izzy has recorded nothing, so that card gets no empty table.
+  assert.equal(await page.locator('.scorecard').nth(1).locator('.culprit-totals').count(), 0);
   await page.close();
 });
 

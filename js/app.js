@@ -3,6 +3,7 @@ import {
   computeScores, PLAYERS, RATINGS, BONUS_RUN_POINTS, BONUS_RUN_MIN, BONUS_RUN_MAX,
 } from './scoring.js';
 import { collectionFor, prizeFor } from './animals.js';
+import { CULPRITS, acceptsCulprits, culpritsFor, culpritTotals } from './culprits.js';
 import { spriteSVG, spriteName } from './sprites.js';
 import * as store from './store.js';
 
@@ -158,11 +159,31 @@ function ratingOf(key, player) {
   return days[key]?.[player] ?? null;
 }
 
+function culpritsOf(key, player) {
+  return culpritsFor(days[key], player);
+}
+
 function choicesHTML(player, key) {
   const current = ratingOf(key, player);
   return `<div class="choices">${RATINGS.map((r) => `
     <button class="choice" data-r="${r}" data-player="${player}" data-key="${key}"
             aria-pressed="${current === r}">${RATING_TEXT[r]}</button>`).join('')}</div>`;
+}
+
+/**
+ * The Culprit picker, shown only once a yellow or red is down. A green Day is
+ * never asked what it ate, and an unrated Day is not asked before it has
+ * answered the question that matters — the colour comes first, always.
+ */
+function culpritsHTML(player, key) {
+  if (!acceptsCulprits(ratingOf(key, player))) return '';
+  const chosen = culpritsOf(key, player);
+  return `<div class="culprits">
+    <p class="culprits-title">WHAT WAS IT? <span>OPTIONAL</span></p>
+    <div class="culprit-row">${CULPRITS.map(({ key: culprit, label }) => `
+      <button class="culprit" data-c="${culprit}" data-player="${player}" data-key="${key}"
+              aria-pressed="${chosen.includes(culprit)}">${label}</button>`).join('')}</div>
+  </div>`;
 }
 
 function renderToday() {
@@ -186,6 +207,7 @@ function renderToday() {
         <span>TODAY <b>${current ? RATING_TEXT[current] : '—'}</b></span>
       </div>
       ${choicesHTML(player, todayKey)}
+      ${culpritsHTML(player, todayKey)}
     </div>`;
   }).join('');
   pendingFlash = null;
@@ -272,6 +294,21 @@ function weekRunText(s) {
   return `${s.weekRun} IN A ROW`;
 }
 
+/**
+ * What has been eaten across a Player's whole history, commonest first. Left
+ * out entirely until something has been recorded — an empty table would just
+ * be a reminder that a question went unanswered.
+ */
+function culpritTotalsHTML(player) {
+  const totals = culpritTotals(days, player);
+  if (!totals.length) return '';
+  return `<div class="culprit-totals">
+    <p class="culprit-totals-title">WHAT GETS YOU</p>
+    ${totals.map(({ label, total }) => `
+      <div class="statline"><span>${label}</span><b>${total}</b></div>`).join('')}
+  </div>`;
+}
+
 function renderScores() {
   $('scores').innerHTML = PLAYERS.map((player) => {
     const s = scores[player];
@@ -291,6 +328,7 @@ function renderScores() {
       <div class="statline"><span>BEST STREAK</span><b>${s.bestStreak}</b></div>
       <div class="statline"><span>MULTIPLIER</span><b>x${s.multiplier}</b></div>
       <div class="statline"><span>THIS WEEK</span><b>${weekRunText(s)}</b></div>
+      ${culpritTotalsHTML(player)}
       ${collection}
     </div>`;
   }).join('');
@@ -303,6 +341,7 @@ function renderEditor() {
     <div class="player">
       <div class="player-head"><span class="player-name">${LABELS[player]}</span></div>
       ${choicesHTML(player, editorKey)}
+      ${culpritsHTML(player, editorKey)}
     </div>`).join('');
 }
 
@@ -443,8 +482,28 @@ async function choose(player, key, rating, origin) {
   if (rating === 'red' && previousRating !== 'red') summonBoss();
 }
 
+/**
+ * Culprits are a multi-select: a Day can be more than one thing at once, and
+ * tapping a chip that is already down takes it back off. Each tap writes the
+ * whole list, so there is no partial state to reconcile.
+ */
+async function toggleCulprit(player, key, culprit) {
+  const current = culpritsOf(key, player);
+  const next = current.includes(culprit)
+    ? current.filter((c) => c !== culprit)
+    : [...current, culprit];
+
+  const local = await store.setCulprits(key, player, next);
+  if (local) { days = local; renderAll(); }
+}
+
 function wireEvents() {
   document.addEventListener('click', (e) => {
+    const culprit = e.target.closest('.culprit');
+    if (culprit) {
+      toggleCulprit(culprit.dataset.player, culprit.dataset.key, culprit.dataset.c);
+      return;
+    }
     const choice = e.target.closest('.choice');
     if (choice) {
       const box = choice.getBoundingClientRect();

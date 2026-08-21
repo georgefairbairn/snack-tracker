@@ -160,6 +160,49 @@ main { padding: 4px 10px 20px; max-width: 560px; margin: 0 auto; }
 .choice[aria-pressed='true'] { outline: 3px solid var(--ink); outline-offset: 3px; }
 .choice:not([aria-pressed='true']) { opacity: 0.5; }
 
+/* ---------------- culprits ---------------- */
+/* Deliberately not red, yellow or green. The whole site reads those three as
+   the Rating, so a Culprit chip that lit up in one of them would look like a
+   second, contradictory judgement of the day. */
+.culprits {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 2px solid #2f2f3d;
+}
+
+.culprits-title {
+  margin: 0 0 8px;
+  font-size: 7px;
+  color: var(--dim);
+}
+.culprits-title span { color: #5a5866; }
+
+.culprit-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.culprit {
+  font-family: inherit;
+  font-size: 7px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--dim);
+  background: var(--panel-2);
+  border: 2px solid #2f2f3d;
+  padding: 6px 2px;
+  min-height: 38px;
+  cursor: pointer;
+  transition: transform 80ms steps(2);
+}
+.culprit:active { transform: translateY(2px); }
+.culprit[aria-pressed='true'] {
+  color: #0c0c10;
+  background: var(--accent);
+  border-color: var(--ink);
+}
+
 .hint {
   text-align: center;
   font-size: 7px;
@@ -274,6 +317,15 @@ main { padding: 4px 10px 20px; max-width: 560px; margin: 0 auto; }
 }
 .statline b { color: var(--ink); font-weight: normal; }
 
+/* A running count of what has actually been eaten, under the stats it does not
+   affect. Culprits are recorded, never scored — see docs/adr/0007. */
+.culprit-totals {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 2px solid #2f2f3d;
+}
+.culprit-totals-title { margin: 0 0 6px; font-size: 7px; color: var(--dim); }
+
 .collection {
   display: flex;
   flex-wrap: wrap;
@@ -330,6 +382,12 @@ main { padding: 4px 10px 20px; max-width: 560px; margin: 0 auto; }
   padding: 14px;
   width: 100%;
   max-width: 340px;
+  /* Two Culprit pickers make this taller than a small phone. The centring
+     flexbox would then push the top and the CLOSE button off both ends of the
+     viewport with no way to scroll to either. */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal-title { margin: 0 0 12px; font-size: 10px; text-align: center; }
 .modal .player { border: 0; box-shadow: none; padding: 0 0 12px; background: transparent; }

@@ -1,4 +1,5 @@
-// Nightly backup of every Rating into the repo.
+// Nightly backup of every Rating, and the Culprits recorded against it, into
+// the repo.
 //
 // The database has no sign-in, so a stranger who finds the site can overwrite a
 // Day inside the backfill window. The rules stop them doing worse than that
@@ -30,7 +31,15 @@ async function fetchAll() {
       const date = doc.name.split('/').pop();
       const entry = {};
       for (const [field, value] of Object.entries(doc.fields ?? {})) {
-        if (typeof value.stringValue === 'string') entry[field] = value.stringValue;
+        // Ratings are strings; Culprit lists are arrays of strings. Anything
+        // else the REST API hands back is not something this app wrote.
+        if (typeof value.stringValue === 'string') {
+          entry[field] = value.stringValue;
+        } else if (value.arrayValue) {
+          entry[field] = (value.arrayValue.values ?? [])
+            .map((v) => v.stringValue)
+            .filter((v) => typeof v === 'string');
+        }
       }
       days[date] = entry;
     }
