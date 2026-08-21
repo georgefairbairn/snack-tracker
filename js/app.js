@@ -614,12 +614,18 @@ function switchView(name) {
 }
 
 async function choose(player, key, rating, origin) {
+  const previousRating = ratingOf(key, player);
+
+  // Pressing the Rating already set changes nothing, so it does nothing. It
+  // used to raise the Day's visitor again, which looked like a second animal
+  // on a Day that had already handed one over.
+  if (previousRating === rating) return;
+
   pendingFlash = { player, rating };
 
   // Worked out from the Rating being pressed rather than from the render that
   // follows it, so the animal is on screen the instant the button goes down and
-  // does not wait on the store answering. Every press raises one, including a
-  // press that changes nothing.
+  // does not wait on the store answering.
   const optimistic = { ...days, [key]: { ...(days[key] ?? {}), [player]: rating } };
   queueReveal(revealFor(player, key, rating, scores, computeScores(optimistic, todayKey)));
 

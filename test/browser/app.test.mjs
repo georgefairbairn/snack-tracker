@@ -151,12 +151,20 @@ test('the hippo shows on every red and joins no collection', async () => {
     [dayKey(2)]: { george: 'green' },
     [dayKey(1)]: { george: 'green' },
   });
-  for (let i = 0; i < 2; i++) {
-    await page.click('.choice[data-player="george"][data-r="red"]');
-    assert.ok(await page.locator('.reveal-card svg[aria-label="HIPPO"]').count() > 0,
-      `the hippo should turn up on red every time, missing on press ${i + 1}`);
+  // Pressed across real changes rather than the same button twice: re-pressing
+  // the Rating already set is deliberately a no-op.
+  for (const [i, rating] of ['red', 'green', 'red'].entries()) {
+    await page.click(`.choice[data-player="george"][data-r="${rating}"]`);
+    if (rating === 'red') {
+      assert.ok(await page.locator('.reveal-card svg[aria-label="HIPPO"]').count() > 0,
+        `the hippo should turn up on red every time, missing on press ${i + 1}`);
+    }
     await dismissReveal(page);
   }
+  await page.click('.choice[data-player="izzy"][data-r="red"]');
+  assert.ok(await page.locator('.reveal-card svg[aria-label="HIPPO"]').count() > 0,
+    'the hippo should turn up for either player');
+  await dismissReveal(page);
 
   await page.click('.tab[data-view="scores"]');
   await page.waitForTimeout(300);
@@ -485,5 +493,43 @@ test('no page threw an error', async () => {
   await page.click('.tab[data-view="scores"]');
   await page.waitForTimeout(400);
   assert.deepEqual(page.errors, []);
+  await page.close();
+});
+
+test('pressing the rating already set does nothing at all', async () => {
+  // Re-pressing green used to raise the Day's visitor again, which looked like
+  // a second animal on a Day that had already handed one over.
+  const page = await open();
+  await page.click('.choice[data-player="george"][data-r="green"]');
+  await dismissReveal(page);
+
+  // The first press throws confetti that lives about 1.3s. Wait for the screen
+  // to go quiet, or the second press inherits it and the assertion lies.
+  await page.waitForFunction(() => document.querySelectorAll('.particle').length === 0,
+    null, { timeout: 5000 });
+
+  await page.click('.choice[data-player="george"][data-r="green"]');
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator('.reveal-card').count(), 0,
+    'a press that changes nothing must raise no card');
+  assert.equal(await page.locator('.particle').count(), 0,
+    'nor any confetti');
+  assert.equal((await readStore(page))[dayKey(0)].george, 'green');
+  await page.close();
+});
+
+test('changing your mind and changing it back brings the same animal', async () => {
+  // The visitor is seeded on the Day alone, so a Day has one visitor however
+  // many times you rewrite it.
+  const page = await open();
+  await page.click('.choice[data-player="george"][data-r="green"]');
+  const first = await page.locator('.reveal-card svg').getAttribute('aria-label');
+  await dismissReveal(page);
+
+  await page.click('.choice[data-player="george"][data-r="yellow"]');
+  const second = await page.locator('.reveal-card svg').getAttribute('aria-label');
+  await dismissReveal(page);
+
+  assert.equal(second, first, 'one day, one visitor');
   await page.close();
 });
