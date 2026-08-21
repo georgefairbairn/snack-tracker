@@ -221,3 +221,52 @@ test('there is nothing left to chase once the ladder is finished', () => {
   assert.equal(greensToNextAnimal('george', last), null);
   assert.equal(greensToNextAnimal('george', last + 50), null);
 });
+
+test('one day brings one visitor, whatever rating you settle on', () => {
+  // Seeding the visitor on the rating dealt a different animal for green and
+  // yellow, so changing your mind paraded a new animal each time and looked
+  // like the Collection filling up.
+  for (let day = 1; day <= 28; day++) {
+    const key = `2026-09-${String(day).padStart(2, '0')}`;
+    assert.equal(
+      visitorFor('george', key, 'green'),
+      visitorFor('george', key, 'yellow'),
+      `${key} dealt two different visitors`,
+    );
+  }
+});
+
+test('a red still summons the boss, not a visitor', () => {
+  assert.equal(visitorFor('george', '2026-09-01', 'red'), BOSS);
+  assert.notEqual(visitorFor('george', '2026-09-01', 'green'), BOSS);
+});
+
+test('different days bring different visitors', () => {
+  const seen = new Set();
+  for (let day = 1; day <= 28; day++) {
+    seen.add(visitorFor('izzy', `2026-09-${String(day).padStart(2, '0')}`, 'green'));
+  }
+  assert.ok(seen.size > 5, `a month should not be one animal, saw ${seen.size}`);
+});
+
+test('a visitor is never mistaken for a collected animal', () => {
+  // Visiting does not move the ladder: only green Days do.
+  const before = collectionFor('george', 4).length;
+  visitorFor('george', '2026-09-02', 'yellow');
+  assert.equal(collectionFor('george', 4).length, before);
+});
+
+test('level counts the rungs cleared, and tops out with the ladder', () => {
+  assert.equal(milestonesFor(0).length, 0);
+  assert.equal(milestonesFor(3).length, 1, 'the first rung is 3 greens');
+  assert.equal(milestonesFor(4).length, 1, 'no rung between 3 and 5');
+  assert.equal(milestonesFor(5).length, 2);
+  assert.equal(milestonesFor(9999).length, LADDER.length, 'level caps at the ladder');
+  assert.equal(greensToNextAnimal('george', 9999), null, 'nothing left to chase');
+});
+
+test('level never exceeds the number of animals that exist', () => {
+  const pooled = Object.values(TIER_POOLS).flat().length;
+  assert.equal(LADDER.length, pooled,
+    'a rung with no animal behind it would count down to nothing');
+});

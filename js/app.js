@@ -3,7 +3,7 @@ import {
   computeScores, PLAYERS, RATINGS, BONUS_RUN_POINTS, BONUS_RUN_MIN, BONUS_RUN_MAX,
 } from './scoring.js';
 import {
-  BOSS, collectionFor, greensToNextAnimal, prizeFor, visitorFor,
+  BOSS, LADDER, collectionFor, greensToNextAnimal, milestonesFor, prizeFor, visitorFor,
 } from './animals.js';
 import { CULPRITS, acceptsCulprits, culpritsFor, culpritTotals } from './culprits.js';
 import { spriteSVG, spriteName } from './sprites.js';
@@ -311,6 +311,31 @@ function culpritTotalsHTML(player) {
  * a row reading zero would be a worse way to find that out than the Collection
  * simply stopping.
  */
+/**
+ * A Player's Level is how many rungs of the animal ladder their green Days have
+ * passed — the same thing their Collection counts, said as a number that only
+ * ever goes up. The bar underneath measures the gap between the rung just
+ * cleared and the next one, so it fills as green Days land.
+ */
+function levelHTML(player, greenTotal) {
+  const cleared = milestonesFor(greenTotal);
+  const level = cleared.length;
+  const togo = greensToNextAnimal(player, greenTotal);
+
+  if (togo === null) {
+    return `<div class="statline"><span>LEVEL</span><b>${level} / ${LADDER.length} — MAXED</b></div>`;
+  }
+
+  const from = cleared.length ? cleared[cleared.length - 1].greens : 0;
+  const to = greenTotal + togo;
+  const pct = Math.round(((greenTotal - from) / (to - from)) * 100);
+
+  return `<div class="statline"><span>LEVEL</span><b>${level} / ${LADDER.length}</b></div>
+    <div class="levelbar" role="img" aria-label="${pct}% to the next animal">
+      <i style="width:${pct}%"></i>
+    </div>`;
+}
+
 function chaseHTML(player, greenTotal) {
   const togo = greensToNextAnimal(player, greenTotal);
   if (togo === null) return '';
@@ -332,6 +357,7 @@ function renderScores() {
     return `<div class="scorecard">
       <h2>${LABELS[player]}</h2>
       <div class="statline"><span>POINTS</span><b data-points="${player}">0</b></div>
+      ${levelHTML(player, s.greenTotal)}
       <div class="statline"><span>GREEN DAYS</span><b>${s.greenTotal}</b></div>
       ${chaseHTML(player, s.greenTotal)}
       <div class="statline"><span>STREAK</span><b>${s.streak}</b></div>
@@ -398,6 +424,17 @@ function celebrate(before) {
 
 // ---------------------------------------------------------------- the reveal
 
+// The one line that says whether this animal was kept. Without it an unlock and
+// a passing visitor look identical, and every rating reads as the Collection
+// growing.
+const REVEAL_BADGE = {
+  unlock: 'NEW ANIMAL — COLLECTED',
+  prize: 'BONUS RUN PRIZE — NOT COLLECTED',
+  visitor: 'JUST VISITING — NOT COLLECTED',
+  boss: 'BUSTED — NOT COLLECTED',
+};
+
+
 /** The animal a Player just earned, if this change earned them one. */
 function unlockedBy(player, before, after) {
   const had = collectionFor(player, before[player].greenTotal).length;
@@ -421,6 +458,7 @@ function revealFor(player, key, rating, before, after) {
 
   if (rating === 'red') {
     return {
+      kind: 'boss',
       key: BOSS,
       title: 'THE HIPPO SAW THAT.',
       note: 'ALWAYS TURNS UP. NEVER COLLECTED.',
@@ -431,6 +469,7 @@ function revealFor(player, key, rating, before, after) {
   const unlocked = unlockedBy(player, before, after);
   if (unlocked) {
     return {
+      kind: 'unlock',
       key: unlocked.key,
       title: `A WILD ${spriteName(unlocked.key)} APPEARS!`,
       note: `${unlocked.tier} — JOINS ${LABELS[player]}'S COLLECTION`,
@@ -445,6 +484,7 @@ function revealFor(player, key, rating, before, after) {
     const run = runs[runs.length - 1];
     const prize = prizeFor(player, run.week, run.length);
     return {
+      kind: 'prize',
       key: prize.key,
       title: `${spriteName(prize.key)} DROPS BY`,
       note: `${run.length} IN A ROW — BONUS RUN PRIZE`,
@@ -454,6 +494,7 @@ function revealFor(player, key, rating, before, after) {
 
   const visitor = visitorFor(player, key, rating);
   return {
+    kind: 'visitor',
     key: visitor,
     title: `${spriteName(visitor)} DROPS BY`,
     note: 'JUST VISITING. NOT COLLECTED.',
@@ -477,7 +518,8 @@ function nextReveal() {
 
   const el = document.createElement('div');
   el.className = 'reveal-card';
-  el.innerHTML = `<div class="reveal-box">
+  el.innerHTML = `<div class="reveal-box is-${item.kind ?? 'visitor'}">
+    <p class="reveal-badge">${REVEAL_BADGE[item.kind] ?? REVEAL_BADGE.visitor}</p>
     <p class="reveal-title">${item.title}</p>
     <div class="reveal-art">${spriteSVG(item.key, { scale: 7 })}</div>
     <p class="reveal-note">${item.note}</p>

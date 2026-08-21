@@ -195,12 +195,14 @@ export const BOSS = 'hippo';
  * The animal that turns up when a Rating is recorded. Red always summons the
  * boss; anything else draws from the Prize pool.
  *
- * Seeded on the Player, the Day and the Rating, so correcting a Day back and
- * forth brings the same animal back rather than dealing a new one on every tap.
+ * Seeded on the Player and the Day only — deliberately NOT the Rating. Seeding
+ * on the Rating too dealt a different animal for green, yellow and red, so
+ * changing your mind about a Day paraded a new animal each time and read as a
+ * Collection filling up. One Day brings one visitor, whatever you settle on.
  * Like any Prize this is shown and forgotten — it joins no Collection, so the
  * pool is free to drift as animals are added.
  */
 export function visitorFor(player, dateKey, rating) {
   if (rating === 'red') return BOSS;
-  return seededShuffle(PRIZE_POOL, `visit:${player}:${dateKey}:${rating}`)[0];
+  return seededShuffle(PRIZE_POOL, `visit:${player}:${dateKey}`)[0];
 }

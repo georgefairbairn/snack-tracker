@@ -669,3 +669,33 @@ main { padding: 4px 10px 20px; max-width: 560px; margin: 0 auto; }
   .players { grid-template-columns: 1fr 1fr; }
   .scores { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---------------- level ---------------- */
+
+/* Progress from the rung just cleared to the next animal. */
+.levelbar {
+  height: 10px;
+  border: 2px solid var(--dim);
+  background: var(--bg);
+  margin: 2px 0 8px;
+}
+.levelbar i {
+  display: block;
+  height: 100%;
+  background: var(--green);
+  min-width: 0;
+}
+
+/* ---------------- reveal card kinds ---------------- */
+
+/* An unlock and a passing visitor used to look identical, so every rating read
+   as the Collection growing. The badge says which it is; the colour backs it up. */
+.reveal-badge {
+  margin: 0 0 8px;
+  font-size: 6px;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.reveal-box.is-unlock { border-color: var(--yellow); }
+.reveal-box.is-unlock .reveal-badge { color: var(--yellow); }
+.reveal-box.is-boss .reveal-badge { color: var(--red); }
