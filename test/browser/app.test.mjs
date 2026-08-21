@@ -72,6 +72,17 @@ const readStore = (page) =>
   page.evaluate(() => JSON.parse(localStorage.getItem('snack-tracker-days') || '{}'));
 
 /**
+ * Presses the reveal card away. Every rating tap raises one and it covers the
+ * screen until dismissed, so a test that taps a rating and then touches
+ * anything else has to clear it first.
+ */
+async function dismissReveal(page) {
+  await page.locator('.reveal-card').first().waitFor({ state: 'visible' });
+  await page.click('.reveal-card');
+  await page.waitForFunction(() => !document.querySelector('.reveal-card'));
+}
+
+/**
  * Waits for a banner matching `pattern`. Banners queue rather than stack — one
  * tap can raise a bonus run, an animal and a co-op bonus — so a test must not
  * assume which one is on screen first.
@@ -107,7 +118,7 @@ test('a plain page load celebrates nothing', async () => {
     [dayKey(1)]: { george: 'green' },
   });
   assert.equal(await page.locator('#fx svg').count(), 0);
-  assert.equal(await page.locator('.toast').count(), 0);
+  assert.equal(await page.locator('.reveal-card').count(), 0);
   assert.equal(await page.locator('.banner').count(), 0);
   await page.close();
 });
@@ -126,9 +137,65 @@ test('a rating persists and a red summons the boss', async () => {
   await page.click('.choice[data-player="izzy"][data-r="red"]');
   await page.waitForTimeout(400);
 
-  assert.match(await page.locator('.toast').first().textContent(), /HIPPO/);
+  assert.match(await page.locator('.reveal-card').textContent(), /HIPPO/);
+  assert.ok(await page.locator('.reveal-card svg[aria-label="HIPPO"]').count() > 0);
   assert.ok(await page.evaluate(() => document.body.classList.contains('shake')));
   assert.equal((await readStore(page))[dayKey(0)].izzy, 'red');
+  await page.close();
+});
+
+test('the hippo shows on every red and joins no collection', async () => {
+  // Red always brings the same animal — it is the one that means you did badly,
+  // so it has to be recognisable on sight rather than drawn.
+  const page = await open({
+    [dayKey(2)]: { george: 'green' },
+    [dayKey(1)]: { george: 'green' },
+  });
+  for (let i = 0; i < 2; i++) {
+    await page.click('.choice[data-player="george"][data-r="red"]');
+    assert.ok(await page.locator('.reveal-card svg[aria-label="HIPPO"]').count() > 0,
+      `the hippo should turn up on red every time, missing on press ${i + 1}`);
+    await dismissReveal(page);
+  }
+
+  await page.click('.tab[data-view="scores"]');
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('.collection svg[aria-label="HIPPO"]').count(), 0,
+    'the hippo must never join a collection');
+  await page.close();
+});
+
+test('every rating raises an animal that waits to be pressed away', async () => {
+  const page = await open();
+  for (const rating of ['green', 'yellow', 'red']) {
+    await page.click(`.choice[data-player="george"][data-r="${rating}"]`);
+    const card = page.locator('.reveal-card');
+    await card.waitFor({ state: 'visible' });
+    assert.ok(await card.locator('svg').count() > 0, `${rating} should show an animal`);
+
+    // It has to still be there well after every timed effect would have expired.
+    await page.waitForTimeout(2500);
+    assert.equal(await card.count(), 1, `${rating}'s animal should wait to be dismissed`);
+    await dismissReveal(page);
+  }
+  await page.close();
+});
+
+test('the card says how many more greens the next animal needs', async () => {
+  // Two green days in, the first animal lands at three.
+  const page = await open({
+    [dayKey(2)]: { george: 'green' },
+    [dayKey(1)]: { george: 'green' },
+  });
+  await page.click('.choice[data-player="george"][data-r="yellow"]');
+  assert.match(await page.locator('.reveal-chase').textContent(),
+    /1 MORE GREEN TO GEORGE'S NEXT ANIMAL/);
+  await dismissReveal(page);
+
+  await page.click('.choice[data-player="george"][data-r="green"]');
+  // That green earned the animal at three, so the count now points at five.
+  assert.match(await page.locator('.reveal-chase').textContent(),
+    /2 MORE GREENS TO GEORGE'S NEXT ANIMAL/);
   await page.close();
 });
 
@@ -142,7 +209,7 @@ test('the calendar backfills a recent day and locks older ones', async () => {
   assert.equal(await page.locator('#editorTitle').textContent(), dayKey(2));
 
   await page.click('#editorBody .choice[data-player="george"][data-r="yellow"]');
-  await page.waitForTimeout(400);
+  await dismissReveal(page);
   assert.equal((await readStore(page))[dayKey(2)].george, 'yellow');
 
   assert.equal(await page.locator(`[data-open="${dayKey(5)}"]`).count(), 0,
@@ -214,14 +281,19 @@ test('a third green day unlocks an animal, with points rolling up', async () => 
   });
   assert.ok(distinct > 3, `points should roll up, saw ${distinct} values`);
 
-  await waitForBanner(page, /A WILD \w+ APPEARS!/);
-  assert.ok(await page.locator('#fx svg.reveal').count() > 0);
+  const card = await page.locator('.reveal-card').textContent();
+  assert.match(card, /A WILD \w+ APPEARS!/);
+  assert.match(card, /JOINS GEORGE'S COLLECTION/);
   await page.close();
 });
 
 test('three green days in one week pay a bonus run and drop a prize', async () => {
   const target = bonusRunDay();
   const page = await open({
+    // An older green day so the third in a row is the fourth green overall and
+    // lands between rungs. A milestone would otherwise take the card, since an
+    // animal joining the collection outranks one that is only visiting.
+    [dayKey(target.offset + 9)]: { george: 'green' },
     [dayKey(target.offset + 2)]: { george: 'green' },
     [dayKey(target.offset + 1)]: { george: 'green' },
   });
@@ -235,9 +307,15 @@ test('three green days in one week pay a bonus run and drop a prize', async () =
     await page.click('#editorBody .choice[data-player="george"][data-r="green"]');
   }
 
+  // The card names the prize; the banner carries the points and waits behind it.
+  assert.match(await page.locator('.reveal-card').textContent(),
+    /3 IN A ROW — BONUS RUN PRIZE/);
+  assert.equal(await page.locator('.banner').count(), 0,
+    'a banner must not play out unseen underneath the card');
+
+  await dismissReveal(page);
   const banner = await waitForBanner(page, /3 IN A ROW!/);
   assert.match(banner, /BONUS RUN\. \+150/);
-  assert.match(await page.locator('.toast').first().textContent(), /PRIZE FOR GEORGE/);
   assert.ok(await page.locator('#fx svg.hop').count() > 0, 'the prize should hop in');
   await page.close();
 });
@@ -253,6 +331,7 @@ test('a bonus run is not paid twice for the same length in one week', async () =
   });
   assert.equal(await page.locator('.banner').count(), 0);
   assert.equal(await page.locator('#fx svg').count(), 0);
+  assert.equal(await page.locator('.reveal-card').count(), 0);
   await page.close();
 });
 
@@ -275,8 +354,38 @@ test('the starfield renders and can never intercept a tap', async () => {
 test('reduced motion suppresses the decoration', async () => {
   const page = await open({}, { reducedMotion: 'reduce' });
   assert.equal(await page.locator('.star').count(), 0);
+
+  // The animal is the reward, not decoration, so it still turns up — it just
+  // does not move. Suppressing it would leave the tap with no answer at all.
+  await page.click('.choice[data-player="george"][data-r="green"]');
+  const card = page.locator('.reveal-card');
+  await card.waitFor({ state: 'visible' });
+  assert.ok(await card.locator('svg').count() > 0);
+  assert.ok(await card.evaluate((el) => el.getBoundingClientRect().height > 0));
+  await dismissReveal(page);
   await page.close();
 });
+
+test('the reveal card fits a small phone without scrolling the page sideways',
+  async () => {
+    const page = await open({}, { viewport: { width: 320, height: 568 } });
+    await page.click('.choice[data-player="george"][data-r="green"]');
+    await page.locator('.reveal-card').waitFor({ state: 'visible' });
+
+    const fit = await page.evaluate(() => {
+      const r = document.querySelector('.reveal-box').getBoundingClientRect();
+      return {
+        top: r.top,
+        bottom: r.bottom,
+        viewport: window.innerHeight,
+        sideways: document.documentElement.scrollWidth > window.innerWidth + 1,
+      };
+    });
+    assert.equal(fit.sideways, false, 'the card scrolls the page sideways');
+    assert.ok(fit.top >= -1 && fit.bottom <= fit.viewport + 1,
+      `the card runs off screen: ${fit.top} to ${fit.bottom} of ${fit.viewport}`);
+    await page.close();
+  });
 
 test('the culprit picker appears on a yellow and never on a green', async () => {
   const page = await open();
@@ -284,12 +393,12 @@ test('the culprit picker appears on a yellow and never on a green', async () => 
     'an unrated day must ask for a colour before it asks what was eaten');
 
   await page.click('.choice[data-player="george"][data-r="yellow"]');
-  await page.waitForTimeout(400);
+  await dismissReveal(page);
   assert.equal(await page.locator('.culprit[data-player="george"]').count(), 6);
   assert.equal(await page.locator('.culprit[data-player="izzy"]').count(), 0);
 
   await page.click('.choice[data-player="george"][data-r="green"]');
-  await page.waitForTimeout(400);
+  await dismissReveal(page);
   assert.equal(await page.locator('.culprit[data-player="george"]').count(), 0);
   await page.close();
 });
@@ -312,7 +421,7 @@ test('a culprit persists, toggles back off, and is cleared by a green', async ()
   // Turning the day green drops the culprits with it — a green day owns up to
   // nothing, and a stale list would outlive the rating it belonged to.
   await page.click('.choice[data-player="izzy"][data-r="green"]');
-  await page.waitForTimeout(400);
+  await dismissReveal(page);
   assert.equal((await readStore(page))[dayKey(0)].izzyCulprits, undefined);
   await page.close();
 });

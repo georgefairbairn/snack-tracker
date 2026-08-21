@@ -2,7 +2,9 @@ import { currentDayKey, isEditable, toKey, fromKey, monthLabel } from './dates.j
 import {
   computeScores, PLAYERS, RATINGS, BONUS_RUN_POINTS, BONUS_RUN_MIN, BONUS_RUN_MAX,
 } from './scoring.js';
-import { collectionFor, prizeFor } from './animals.js';
+import {
+  BOSS, collectionFor, greensToNextAnimal, prizeFor, visitorFor,
+} from './animals.js';
 import { CULPRITS, acceptsCulprits, culpritsFor, culpritTotals } from './culprits.js';
 import { spriteSVG, spriteName } from './sprites.js';
 import * as store from './store.js';
@@ -41,14 +43,6 @@ function fx(html, ms = 6200) {
   setTimeout(() => node.remove(), ms);
 }
 
-function toast(text, ms = 3600) {
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.innerHTML = text;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), ms);
-}
-
 // Banners can collide — a level-up and a co-op bonus land on the same tap — so
 // they queue rather than stack on top of each other.
 const bannerQueue = [];
@@ -60,6 +54,9 @@ function banner(title, subtitle = '') {
 }
 
 function nextBanner() {
+  // A reveal card holds the screen until it is pressed. Banners wait behind it
+  // rather than playing out unseen underneath, and resume when it is dismissed.
+  if (revealNode) { bannerRunning = false; return; }
   const item = bannerQueue.shift();
   if (!item) { bannerRunning = false; return; }
   bannerRunning = true;
@@ -309,6 +306,18 @@ function culpritTotalsHTML(player) {
   </div>`;
 }
 
+/**
+ * How far off the next animal is. Omitted once there is none left to earn —
+ * a row reading zero would be a worse way to find that out than the Collection
+ * simply stopping.
+ */
+function chaseHTML(player, greenTotal) {
+  const togo = greensToNextAnimal(player, greenTotal);
+  if (togo === null) return '';
+  return `<div class="statline"><span>NEXT ANIMAL</span>`
+    + `<b>${togo} GREEN${togo === 1 ? '' : 'S'} TO GO</b></div>`;
+}
+
 function renderScores() {
   $('scores').innerHTML = PLAYERS.map((player) => {
     const s = scores[player];
@@ -324,6 +333,7 @@ function renderScores() {
       <h2>${LABELS[player]}</h2>
       <div class="statline"><span>POINTS</span><b data-points="${player}">0</b></div>
       <div class="statline"><span>GREEN DAYS</span><b>${s.greenTotal}</b></div>
+      ${chaseHTML(player, s.greenTotal)}
       <div class="statline"><span>STREAK</span><b>${s.streak}</b></div>
       <div class="statline"><span>BEST STREAK</span><b>${s.bestStreak}</b></div>
       <div class="statline"><span>MULTIPLIER</span><b>x${s.multiplier}</b></div>
@@ -375,20 +385,119 @@ function celebrate(before) {
       awardPrize(player, run);
     }
 
-    const critters = collectionFor(player, now.greenTotal);
-    const had = collectionFor(player, was.greenTotal);
-    if (critters.length > had.length) {
-      const newest = critters[critters.length - 1];
-      banner(`A WILD ${spriteName(newest.key)} APPEARS!`,
-        `${newest.tier} — FOUND BY ${LABELS[player]}`);
-      fx(spriteSVG(newest.key, { scale: 6, className: 'reveal' }), 2800);
-    } else if (now.multiplier > was.multiplier) {
+    // A new animal gets no banner: the reveal card announces it by name the
+    // moment the button goes down, and a banner would only repeat it.
+    if (now.multiplier > was.multiplier) {
       banner('LEVEL UP!', `${LABELS[player]} IS ON x${now.multiplier} NOW`);
     }
   }
 
   const bothGreen = PLAYERS.every((p) => ratingOf(todayKey, p) === 'green');
   if (bothGreen && !previousBothGreen) banner('BOTH GREEN!', 'CO-OP BONUS. +50 EACH.');
+}
+
+// ---------------------------------------------------------------- the reveal
+
+/** The animal a Player just earned, if this change earned them one. */
+function unlockedBy(player, before, after) {
+  const had = collectionFor(player, before[player].greenTotal).length;
+  const now = collectionFor(player, after[player].greenTotal);
+  return now.length > had ? now[now.length - 1] : null;
+}
+
+/**
+ * What the card shows, and what it is allowed to claim.
+ *
+ * A red Day always summons the boss. It is the one animal that means you did
+ * badly, so it has to be the same every time and recognisable on sight — which
+ * is also why it can never join a Collection. Above it sits the animal a
+ * Milestone just earned, then the Prize a Bonus Run just paid. Everything else
+ * is a Prize too: an animal that turns up, is admired, and is not collected.
+ */
+function revealFor(player, key, rating, before, after) {
+  const togo = greensToNextAnimal(player, after[player].greenTotal);
+  const chase = togo === null ? ''
+    : `${togo} MORE GREEN${togo === 1 ? '' : 'S'} TO ${LABELS[player]}'S NEXT ANIMAL`;
+
+  if (rating === 'red') {
+    return {
+      key: BOSS,
+      title: 'THE HIPPO SAW THAT.',
+      note: 'ALWAYS TURNS UP. NEVER COLLECTED.',
+      chase,
+    };
+  }
+
+  const unlocked = unlockedBy(player, before, after);
+  if (unlocked) {
+    return {
+      key: unlocked.key,
+      title: `A WILD ${spriteName(unlocked.key)} APPEARS!`,
+      note: `${unlocked.tier} — JOINS ${LABELS[player]}'S COLLECTION`,
+      chase,
+    };
+  }
+
+  // A Bonus Run's Prize, so the card and the lap that follows it agree on which
+  // animal turned up.
+  const runs = after[player].bonusRuns;
+  if (runs.length > before[player].bonusRuns.length) {
+    const run = runs[runs.length - 1];
+    const prize = prizeFor(player, run.week, run.length);
+    return {
+      key: prize.key,
+      title: `${spriteName(prize.key)} DROPS BY`,
+      note: `${run.length} IN A ROW — BONUS RUN PRIZE`,
+      chase,
+    };
+  }
+
+  const visitor = visitorFor(player, key, rating);
+  return {
+    key: visitor,
+    title: `${spriteName(visitor)} DROPS BY`,
+    note: 'JUST VISITING. NOT COLLECTED.',
+    chase,
+  };
+}
+
+// Cards wait rather than replace each other, so logging both Players one after
+// the other shows both animals instead of losing the first.
+const revealQueue = [];
+let revealNode = null;
+
+function queueReveal(item) {
+  revealQueue.push(item);
+  if (!revealNode) nextReveal();
+}
+
+function nextReveal() {
+  const item = revealQueue.shift();
+  if (!item) { revealNode = null; return; }
+
+  const el = document.createElement('div');
+  el.className = 'reveal-card';
+  el.innerHTML = `<div class="reveal-box">
+    <p class="reveal-title">${item.title}</p>
+    <div class="reveal-art">${spriteSVG(item.key, { scale: 7 })}</div>
+    <p class="reveal-note">${item.note}</p>
+    ${item.chase ? `<p class="reveal-chase">${item.chase}</p>` : ''}
+    <p class="reveal-hint">TAP ANYWHERE TO CARRY ON</p>
+  </div>`;
+  // On the card itself rather than on the document: the card is raised from
+  // inside a click handler, and a document listener would catch the very tap
+  // that opened it and close it again in the same breath.
+  el.addEventListener('click', dismissReveal);
+  document.body.appendChild(el);
+  revealNode = el;
+}
+
+function dismissReveal() {
+  if (!revealNode) return;
+  revealNode.remove();
+  revealNode = null;
+  nextReveal();
+  if (!revealNode && !bannerRunning) nextBanner();
 }
 
 // ---------------------------------------------------------------- prizes
@@ -400,10 +509,10 @@ const PRIZE_MS = { hop: 3400, scurry: 3400, swim: 6200, reveal: 2800, parade: 56
 /** Every day of a Bonus Run pays a Prize: an animal turns up, does a lap, leaves. */
 function awardPrize(player, run) {
   const prize = prizeFor(player, run.week, run.length);
-  toast(`PRIZE FOR ${LABELS[player]}<br>${spriteName(prize.key)} DROPS BY`);
 
   // The reduced-motion rule freezes every animation, so a Prize sprite would
-  // park itself on screen instead of crossing it. The toast carries the news.
+  // park itself on screen instead of crossing it. The reveal card has already
+  // named the animal, so there is nothing left to say here.
   if (reducedMotion) return;
 
   if (prize.move === 'parade') {
@@ -421,12 +530,6 @@ function awardPrize(player, run) {
 
 function releaseWhale() {
   fx(spriteSVG('bluewhale', { scale: 6, className: 'swim' }));
-}
-
-function summonBoss() {
-  fx(spriteSVG('hippo', { scale: 5, className: 'stomp' }), 2800);
-  toast('THE HIPPO SAW THAT.');
-  shake();
 }
 
 function releaseMouse() {
@@ -469,17 +572,22 @@ function switchView(name) {
 }
 
 async function choose(player, key, rating, origin) {
-  const previousRating = ratingOf(key, player);
   pendingFlash = { player, rating };
 
-  if (origin && rating !== 'red') {
+  // Worked out from the Rating being pressed rather than from the render that
+  // follows it, so the animal is on screen the instant the button goes down and
+  // does not wait on the store answering. Every press raises one, including a
+  // press that changes nothing.
+  const optimistic = { ...days, [key]: { ...(days[key] ?? {}), [player]: rating } };
+  queueReveal(revealFor(player, key, rating, scores, computeScores(optimistic, todayKey)));
+
+  if (rating === 'red') shake();
+  else if (origin) {
     particles(origin.x, origin.y, RATING_COLOUR[rating], rating === 'green' ? 16 : 8);
   }
 
   const local = await store.setRating(key, player, rating);
   if (local) { days = local; renderAll(); }
-
-  if (rating === 'red' && previousRating !== 'red') summonBoss();
 }
 
 /**
@@ -519,6 +627,10 @@ function wireEvents() {
       return;
     }
     if (e.target.id === 'logoSecret') releaseMouse();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (revealNode && (e.key === 'Escape' || e.key === 'Enter')) dismissReveal();
   });
 
   for (const tab of document.querySelectorAll('.tab')) {

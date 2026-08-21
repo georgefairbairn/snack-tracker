@@ -114,6 +114,25 @@ export function milestonesFor(greenTotal) {
 }
 
 /**
+ * How many more green Days a Player needs before their Collection grows again,
+ * or null once there is nothing left to earn.
+ *
+ * Measured by asking what the Collection would hold at each later rung rather
+ * than by subtracting the next rung's number. Today every rung yields a new
+ * animal, but `collectionFor` skips a draw it has already seen, and a ladder
+ * that ever produced one would otherwise count down to an animal that never
+ * turns up.
+ */
+export function greensToNextAnimal(player, greenTotal) {
+  const have = collectionFor(player, greenTotal).length;
+  for (const rung of LADDER) {
+    if (rung.greens <= greenTotal) continue;
+    if (collectionFor(player, rung.greens).length > have) return rung.greens - greenTotal;
+  }
+  return null;
+}
+
+/**
  * Derives a Player's Collection from their cumulative green Days. Deduplicated
  * and in the order first earned — a Collection is a set, and only unlocked
  * animals are ever shown.
@@ -165,4 +184,23 @@ export function prizeFor(player, week, length) {
     key: order[length % order.length],
     move: PRIZE_MOVES[length] ?? 'hop',
   };
+}
+
+// What a red Day summons. Always the same animal, never drawn and never
+// collected — the one animal that means you did badly has to be recognisable on
+// sight, so it cannot also be a reward.
+export const BOSS = 'hippo';
+
+/**
+ * The animal that turns up when a Rating is recorded. Red always summons the
+ * boss; anything else draws from the Prize pool.
+ *
+ * Seeded on the Player, the Day and the Rating, so correcting a Day back and
+ * forth brings the same animal back rather than dealing a new one on every tap.
+ * Like any Prize this is shown and forgotten — it joins no Collection, so the
+ * pool is free to drift as animals are added.
+ */
+export function visitorFor(player, dateKey, rating) {
+  if (rating === 'red') return BOSS;
+  return seededShuffle(PRIZE_POOL, `visit:${player}:${dateKey}:${rating}`)[0];
 }

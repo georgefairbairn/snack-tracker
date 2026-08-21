@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPRITES, SPRITE_SIZE, spriteSVG } from '../js/sprites.js';
-import { TIER_POOLS, LADDER, drawFor, collectionFor, milestonesFor } from '../js/animals.js';
+import {
+  BOSS, TIER_POOLS, LADDER, drawFor, collectionFor, greensToNextAnimal,
+  milestonesFor, visitorFor,
+} from '../js/animals.js';
 
 test('every sprite row is exactly the sprite width', () => {
   for (const [key, sprite] of Object.entries(SPRITES)) {
@@ -153,4 +156,68 @@ test('a collection only ever grows as green days accumulate', () => {
 
 test('an empty history unlocks nothing', () => {
   assert.deepEqual(collectionFor('izzy', 0), []);
+});
+
+// ---------------------------------------------------------------- the visitor
+
+test('the boss turns up on every red, for either player', () => {
+  // Red always brings the same animal. It is the one that means you did badly,
+  // so it has to be recognisable on sight rather than drawn.
+  for (const player of ['george', 'izzy']) {
+    for (const key of ['2026-08-12', '2026-01-01', '2027-12-31']) {
+      assert.equal(visitorFor(player, key, 'red'), BOSS);
+    }
+  }
+});
+
+test('the boss is never collectable', () => {
+  // Not in a tier, so no ladder position can ever draw it.
+  assert.equal(Object.values(TIER_POOLS).flat().includes(BOSS), false);
+  for (const player of ['george', 'izzy']) {
+    const everything = collectionFor(player, 1000).map((c) => c.key);
+    assert.equal(everything.includes(BOSS), false);
+  }
+});
+
+test('a green or yellow visitor is drawn, stable, and never the boss', () => {
+  const pool = Object.values(TIER_POOLS).flat();
+  for (const rating of ['green', 'yellow']) {
+    const visitor = visitorFor('george', '2026-08-12', rating);
+    assert.ok(pool.includes(visitor), `${visitor} should come from the prize pool`);
+    // Correcting a day back and forth must bring the same animal back rather
+    // than dealing a new one on every tap.
+    assert.equal(visitorFor('george', '2026-08-12', rating), visitor);
+  }
+});
+
+test('visitors differ by player, day and rating', () => {
+  const seen = new Set();
+  for (const player of ['george', 'izzy']) {
+    for (const key of ['2026-08-10', '2026-08-11', '2026-08-12']) {
+      for (const rating of ['green', 'yellow']) seen.add(visitorFor(player, key, rating));
+    }
+  }
+  assert.ok(seen.size > 1, 'a visitor that never changes is not a draw');
+});
+
+// ---------------------------------------------------------------- the chase
+
+test('the countdown lands exactly on the day the collection grows', () => {
+  for (const player of ['george', 'izzy']) {
+    for (let greens = 0; greens < LADDER[LADDER.length - 1].greens; greens++) {
+      const togo = greensToNextAnimal(player, greens);
+      assert.ok(togo > 0, `at ${greens} greens there is still an animal to come`);
+      const have = collectionFor(player, greens).length;
+      assert.equal(collectionFor(player, greens + togo).length, have + 1,
+        `${player} at ${greens} greens was promised an animal ${togo} greens away`);
+      assert.equal(collectionFor(player, greens + togo - 1).length, have,
+        `${player} at ${greens} greens got the animal earlier than promised`);
+    }
+  }
+});
+
+test('there is nothing left to chase once the ladder is finished', () => {
+  const last = LADDER[LADDER.length - 1].greens;
+  assert.equal(greensToNextAnimal('george', last), null);
+  assert.equal(greensToNextAnimal('george', last + 50), null);
 });

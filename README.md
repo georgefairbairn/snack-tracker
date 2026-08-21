@@ -102,6 +102,31 @@ each Player has actually recorded, commonest first. The categories live in
 but a key may never be renamed — it is what every day already recorded points
 at.
 
+## Every rating shows an animal
+
+Press any colour and an animal turns up on a card that **stays until you press
+the screen**. Nothing about it is on a timer, and two cards queue rather than
+replace each other, so logging both players one after the other shows both
+animals. Each card also says **how many more greens the next animal needs**.
+
+| What you pressed | What turns up |
+| --- | --- |
+| 🔴 Red | The hippo, always |
+| Anything that crossed a milestone | The animal you just unlocked |
+| Anything that completed a bonus run rung | That rung's prize |
+| Anything else | A prize, drawn for you, the day and the colour |
+
+The hippo is the **boss**. It is fixed rather than drawn, it is in no rarity
+tier and no prize pool, and `npm test` asserts it never lands in a collection at
+any green-day total. An animal that means you did badly has to be recognisable
+on sight — if red dealt from the same pool as green the card would be a slot
+machine, and a collectable hippo would make a red worth something.
+
+Banners wait behind the card rather than playing out unseen underneath it, and
+the card survives `prefers-reduced-motion` — it just stops moving. The reward is
+not decoration. See
+[ADR 0008](./docs/adr/0008-every-rating-raises-a-reveal.md).
+
 ## Animals
 
 Animals come from **cumulative green days**, counted for good. Every green day
@@ -135,13 +160,15 @@ here. That is the point of them.
 ## Animation
 
 Scores roll up rather than snapping, greens throw pixel confetti, a red shakes
-the cabinet, reaching a new multiplier tier or unlocking an animal raises a
-banner, and the calendar cascades in when you change month. Each day of a Bonus
-Run sends a Prize across the screen, getting bigger as the run gets longer — a
-hop, a scurry, a swim, a full-screen reveal, and a parade on the seventh.
+the cabinet, reaching a new multiplier tier raises a banner, and the calendar
+cascades in when you change month. Each day of a Bonus Run sends a Prize across
+the screen, getting bigger as the run gets longer — a hop, a scurry, a swim, a
+full-screen reveal, and a parade on the seventh. The animal on a reveal card
+pops in and then keeps breathing while it waits: a still sprite on a stopped
+screen reads as a crash.
 
-Banners queue rather than stack, since one tap can raise a bonus run, an animal
-and a co-op bonus at once.
+Banners queue rather than stack, since one tap can raise a bonus run and a
+co-op bonus at once, and the queue holds entirely while a reveal card is up.
 
 All of it is suppressed under `prefers-reduced-motion: reduce`, including the
 starfield — that is a real setting people turn on for real reasons, not a
@@ -150,7 +177,10 @@ checkbox.
 Three things to know if you touch the CSS. Animation rules live at the end of
 the stylesheet, so **never restate `position` on an element that is already
 `fixed`** — doing so once dropped the tab bar out of the viewport into the page
-flow. `[hidden] { display: none !important }` near the top is load-bearing:
+flow. The layer order matters too: the reveal card sits at 72, above the day
+editor at 70 so a rating set from the calendar is answered on top of the modal
+it was set in, and below `.fx` at 74 so a bonus-run prize laps across the front
+of it. `[hidden] { display: none !important }` near the top is load-bearing:
 without it `.modal { display: flex }` wins, and an invisible modal covers the
 page and swallows every tap. And `.modal-box` carries `max-height: 100%` with
 `overflow-y: auto` because the centring flexbox around it overflows in both

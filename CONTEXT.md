@@ -65,8 +65,16 @@ The animals a Player has unlocked. Each Player has their own, and the two will d
 _Avoid_: inventory, zoo, gallery
 
 **Prize**:
-The animal that turns up, does one lap of the screen and leaves on each day of a Bonus Run. Announced, unlike a Secret, and never collected — a Prize joins no Collection, which is why it can be any animal at all.
+An animal that turns up, is shown once and is never collected. A Prize joins no Collection, which is why it can be any animal at all. Every Rating brings one, and each day of a Bonus Run also sends one across the screen. Announced, unlike a Secret.
 _Avoid_: easter egg, reward, drop
+
+**Reveal**:
+The card that a Rating raises: one animal, what it is, and how far off the next Milestone is. It holds the screen until it is pressed away, so nothing about it is missed — banners wait behind it rather than playing out underneath. Shows the animal a Milestone just earned if there is one, the Boss on a red, and a Prize otherwise.
+_Avoid_: popup, modal, dialog, alert
+
+**Boss**:
+The hippo, and only ever the hippo — what a red Rating summons. Never drawn, never a Prize and never in a Collection: the one animal that means you did badly has to be recognisable on sight, so it cannot also be a reward.
+_Avoid_: villain, monster, penalty animal
 
 **Secret**:
 A hidden easter egg found by exploring rather than earned. Never referenced anywhere in the interface — a Secret that is advertised is not one. Distinct from a Prize, which is earned and announced.
