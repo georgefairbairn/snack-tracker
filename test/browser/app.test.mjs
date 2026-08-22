@@ -533,3 +533,18 @@ test('changing your mind and changing it back brings the same animal', async () 
   assert.equal(second, first, 'one day, one visitor');
   await page.close();
 });
+
+test('a refused write says so instead of failing silently', async () => {
+  // A Security Rule turning writes down used to look identical to a tap that
+  // had not registered: no message, no log, nothing.
+  const page = await open({ [dayKey(0)]: { george: 'red' } });
+  await page.evaluate(() => {
+    // Make the next write fail the way a rejected rule does.
+    localStorage.setItem = () => { throw new Error('permission-denied'); };
+  });
+
+  await page.click('.culprit[data-player="george"][data-c="takeout"]');
+  await page.locator('.notice').waitFor({ state: 'visible', timeout: 4000 });
+  assert.match(await page.locator('.notice').textContent(), /COULDN'T SAVE/);
+  await page.close();
+});

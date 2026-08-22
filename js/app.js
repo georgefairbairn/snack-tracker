@@ -67,6 +67,19 @@ function nextBanner() {
   setTimeout(() => { el.remove(); nextBanner(); }, reducedMotion ? 400 : 1900);
 }
 
+/**
+ * Says something went wrong. Deliberately not a banner — banners are the
+ * celebration style, and a write being refused should not look like a prize.
+ */
+function notice(html, ms = 4200) {
+  const el = document.createElement('div');
+  el.className = 'notice';
+  el.setAttribute('role', 'status');
+  el.innerHTML = html;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
 function shake() {
   if (reducedMotion) return;
   document.body.classList.add('shake');
@@ -634,7 +647,7 @@ async function choose(player, key, rating, origin) {
     particles(origin.x, origin.y, RATING_COLOUR[rating], rating === 'green' ? 16 : 8);
   }
 
-  const local = await store.setRating(key, player, rating);
+  const local = await saving(store.setRating(key, player, rating));
   if (local) { days = local; renderAll(); }
 }
 
@@ -649,8 +662,23 @@ async function toggleCulprit(player, key, culprit) {
     ? current.filter((c) => c !== culprit)
     : [...current, culprit];
 
-  const local = await store.setCulprits(key, player, next);
+  const local = await saving(store.setCulprits(key, player, next));
   if (local) { days = local; renderAll(); }
+}
+
+/**
+ * Every write goes through here. A rejected write used to throw into nothing —
+ * no message, no log — so a Security Rule that turned writes down looked
+ * identical to a tap that had not registered. Now it says so.
+ */
+async function saving(promise) {
+  try {
+    return await promise;
+  } catch (err) {
+    console.error('Write rejected:', err);
+    notice("COULDN'T SAVE THAT.<br>NOT WRITTEN DOWN.");
+    return null;
+  }
 }
 
 function wireEvents() {
