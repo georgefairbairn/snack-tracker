@@ -26,10 +26,13 @@ service cloud.firestore {
     // The Culprit categories, mirroring js/culprits.js. A Culprit list is
     // bounded and drawn only from these keys, so the worst a stranger can store
     // here is a short list of known words.
-    function validCulprits(list) {
-      return list is list
-          && list.size() <= 6
-          && list.hasOnly(['sweet', 'savoury', 'takeout', 'alcohol', 'eatingout', 'fizzy']);
+    // The parameter is NOT called `list`: `list is list` collides with the type
+    // keyword and the rules compiler refuses it, which silently leaves the
+    // previously published rules in force.
+    function validCulprits(items) {
+      return items is list
+          && items.size() <= 6
+          && items.hasOnly(['sweet', 'savoury', 'takeout', 'alcohol', 'eatingout', 'fizzy']);
     }
 
     // Only the two Players, only the three Ratings, and each Player's optional

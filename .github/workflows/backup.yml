@@ -25,12 +25,16 @@ jobs:
 
       - name: Commit if anything changed
         run: |
-          if git diff --quiet -- data/backup.json; then
+          # `git diff` reports no change for an UNTRACKED file, so the very
+          # first backup looked like "nothing to do" and never committed —
+          # which meant no backup ever committed. Stage first, then compare
+          # against the index, which sees a new file for what it is.
+          git add data/backup.json
+          if git diff --cached --quiet -- data/backup.json; then
             echo "No changes to back up."
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/backup.json
           git commit -m "Nightly backup of ratings"
           git push
