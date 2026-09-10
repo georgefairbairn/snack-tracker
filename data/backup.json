@@ -4,16 +4,16 @@
     "izzy": "red"
   },
   "2026-08-10": {
-    "george": "red",
-    "izzy": "yellow"
+    "izzy": "yellow",
+    "george": "red"
   },
   "2026-08-11": {
     "george": "green",
     "izzy": "green"
   },
   "2026-08-12": {
-    "izzy": "green",
-    "george": "green"
+    "george": "green",
+    "izzy": "green"
   },
   "2026-08-13": {
     "izzy": "red",
@@ -48,8 +48,8 @@
     "izzy": "green"
   },
   "2026-08-21": {
-    "george": "red",
-    "izzy": "red"
+    "izzy": "red",
+    "george": "red"
   },
   "2026-08-22": {
     "george": "red",
@@ -63,12 +63,12 @@
     "george": "green"
   },
   "2026-08-25": {
-    "izzy": "red",
-    "george": "red"
+    "george": "red",
+    "izzy": "red"
   },
   "2026-08-26": {
-    "george": "green",
-    "izzy": "green"
+    "izzy": "green",
+    "george": "green"
   },
   "2026-08-29": {
     "izzy": "red"
@@ -84,5 +84,17 @@
   },
   "2026-09-02": {
     "izzy": "red"
+  },
+  "2026-09-07": {
+    "george": "red",
+    "izzy": "red"
+  },
+  "2026-09-08": {
+    "george": "red",
+    "izzy": "red"
+  },
+  "2026-09-09": {
+    "george": "green",
+    "izzy": "green"
   }
 }
