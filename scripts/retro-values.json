@@ -1,0 +1,20 @@
+{
+  "2026-08-27": { "george": "yellow", "izzy": "yellow" },
+  "2026-08-28": { "george": "red",    "izzy": "red" },
+  "2026-08-29": { "george": "red" },
+  "2026-08-30": { "george": "red" },
+  "2026-08-31": { "george": "red" },
+  "2026-09-01": { "george": "red" },
+  "2026-09-02": { "george": "red" },
+  "2026-09-03": { "george": "red",    "izzy": "red" },
+  "2026-09-04": { "george": "red",    "izzy": "red" },
+  "2026-09-05": { "george": "red",    "izzy": "red" },
+  "2026-09-06": { "george": "red",    "izzy": "red" },
+  "2026-09-10": { "george": "green",  "izzy": "green" },
+  "2026-09-11": { "george": "red",    "izzy": "red" },
+  "2026-09-14": { "george": "yellow", "izzy": "green" },
+  "2026-09-17": { "george": "red",    "izzy": "red" },
+  "2026-09-18": { "george": "red",    "izzy": "red" },
+  "2026-09-19": { "george": "red",    "izzy": "red" },
+  "2026-09-20": { "george": "red",    "izzy": "red" }
+}
